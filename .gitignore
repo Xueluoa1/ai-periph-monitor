@@ -1,0 +1,28 @@
+# Local environments and build output
+.venv/
+.build-venv/
+venv/
+__pycache__/
+*.py[cod]
+*.spec
+build/
+dist/
+output/
+release/
+github-upload/
+# Binaries belong in GitHub Releases
+*.exe
+*.zip
+*.log
+*.jsonl
+*.lnk
+# Local settings / credentials
+.env
+.env.*
+!.env.example
+tray_config.json
+tray_pid.txt
+*.pem
+*.key
+.DS_Store
+Thumbs.db

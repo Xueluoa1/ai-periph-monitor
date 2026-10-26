@@ -1,0 +1,188 @@
+{
+  "rog": {
+    "page": "https://rog.asus.com/",
+    "asset_url": "https://rog.asus.com/rog/nuxtStatic/img/logo-rog.svg",
+    "preparation": "Eye symbol from the official lockup; white monochrome for dark background.",
+    "retrieved": "2026-10-19"
+  },
+  "atk": {
+    "page": "https://www.atk.store/",
+    "asset_url": "https://cdn.shopify.com/s/files/1/0691/4942/5882/files/atk_logo-white.png?v=1712483250",
+    "preparation": "Official white header wordmark.",
+    "retrieved": "2026-10-19"
+  },
+  "vxe": {
+    "page": "https://www.atk.store/pages/official-stores",
+    "asset_url": "https://cdn.shopify.com/s/files/1/0691/4942/5882/files/20260324-150618.png?v=1774335998",
+    "preparation": "Official VXE store badge as listed by ATK; original white background retained.",
+    "retrieved": "2026-10-19"
+  },
+  "vgn": {
+    "page": "https://www.vgnlab.com.cn/",
+    "asset_url": "https://static.vgnclub.com/vgn/web/ICON-LOGO.png",
+    "preparation": "Official white header wordmark.",
+    "retrieved": "2026-10-19"
+  },
+  "angrymiao": {
+    "page": "https://www.angrymiao.com/",
+    "asset_url": "https://www.angrymiao.com/img/logo.0bd130c6.png",
+    "preparation": "Orange symbol from official website lockup.",
+    "retrieved": "2026-10-19"
+  },
+  "razer": {
+    "page": "https://www.razer.com/",
+    "asset_url": "https://assets2.razerzone.com/images/phoenix/razer-ths-logo.svg",
+    "preparation": "Official green triple-headed snake symbol.",
+    "retrieved": "2026-10-19"
+  },
+  "mchose": {
+    "page": "https://www.mchose.store/",
+    "asset_url": "https://www.mchose.store/cdn/shop/files/MCHOSE_LOGO_4ef9f8d9-2c90-40e3-a170-03aa6193204b.png?v=1766731393",
+    "preparation": "Official wordmark; white monochrome for dark background.",
+    "retrieved": "2026-10-19"
+  },
+  "lamzu": {
+    "page": "https://lamzu.com/",
+    "asset_url": "https://lamzu.com/cdn/shop/files/lQLPJxZxXO--npPNAWPNB0qwWkzXOEDu6bACuszgo8CvAA_1866_355.png?v=1656326136",
+    "preparation": "Official white header wordmark.",
+    "retrieved": "2026-10-19"
+  },
+  "wlmouse": {
+    "page": "https://www.wlmouse.com/",
+    "asset_url": "https://www.wlmouse.com/cdn/shop/files/WLMOUSE_logo_-white.svg?v=1731468101",
+    "preparation": "Official white/orange header wordmark.",
+    "retrieved": "2026-10-19"
+  },
+  "logitech": {
+    "page": "https://www.logitech.com/en-us",
+    "asset_url": "https://www.logitech.com/content/dam/logitech/en/nav/brand-logos/logitech.svg",
+    "preparation": "Official blue wordmark.",
+    "retrieved": "2026-10-19"
+  },
+  "dareu": {
+    "page": "https://cn.dareu.com/",
+    "asset_url": "https://media.dareu.com/dareu/images/sha256/61/61b2d526c7e76f4d17c39793869eee953d43bc365209be693ac49aff5d185357.svg",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "rapoo": {
+    "page": "https://www.rapoo.cn/",
+    "asset_url": "https://www.rapoo.cn/image/logo.svg",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "ajazz": {
+    "page": "https://www.a-jazz.com/",
+    "asset_url": "https://25789609.s21i.faiusr.com/4/ABUIABAEGAAg0pG-uwYotoPfywQwrww4pQQ.png",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "aula": {
+    "page": "https://aulacn.com/",
+    "asset_url": "https://aulacn.com/web/images/zz-logo.png",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "darmoshark": {
+    "page": "https://darmoshark.cn/",
+    "asset_url": "https://darmoshark.cn/uploads/20211125/d69695619b104dbeb5ba96f5a9bfb175.png",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "incott": {
+    "page": "https://www.szironcat.com/",
+    "asset_url": null,
+    "preparation": "官网素材暂不可访问，使用普通字体品牌名称占位，非官方 logo。",
+    "retrieved": "2026-10-19"
+  },
+  "delux": {
+    "page": "https://www.deluxworld.com/",
+    "asset_url": "https://www.deluxworld.com/webfile/index/images/logo01.png",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "inphic": {
+    "page": "https://www.inphic.cn/",
+    "asset_url": "https://www.inphic.cn/file/upload/spae267/2023-11/09/202311091225336717.png",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "thunderobot": {
+    "page": "https://www.thunderobot.com/",
+    "asset_url": "https://cdn.thunderobot.com/activity_m/qiye/logo.png",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "machenike": {
+    "page": "https://global.machenike.com/",
+    "asset_url": "https://global.machenike.com/cdn/shop/files/Machenike_Logo.png?v=1775203950&width=500",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "flesports": {
+    "page": "https://www.flesports.com/",
+    "asset_url": "https://www.flesports.com/wp-content/uploads/2025/02/cropped-腹灵LOGO_2-02-1-192x192.png",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "durgod": {
+    "page": "https://www.durgod.com/",
+    "asset_url": "https://www.durgod.com/wp-content/uploads/2023/11/LOGO.png",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "kzzi": {
+    "page": "https://en.kzzi.com/",
+    "asset_url": "https://en.kzzi.com/media/images/20220720/20220720174550_9387.png",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "rk": {
+    "page": "https://en.rkgaming.com/",
+    "asset_url": "https://en.rkgaming.com/media/images/20260310/20260310133440_1785.png",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "akko": {
+    "page": "https://akkogear.com/",
+    "asset_url": "https://33357402.s21i.faiusr.com/4/ABUIABAEGAAgtJH4vwYo0sfR4AIwqkc4wRQ.png.webp",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "lofree": {
+    "page": "https://www.lofree.com.cn/",
+    "asset_url": "https://www.lofree.com.cn/assets/img/logo-lofree.svg",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "varmilo": {
+    "page": "https://varmilo.com/zh-cn",
+    "asset_url": "https://cdn.shopify.com/s/files/1/0638/1420/5659/files/9d83b6c98cbb9170feb6a1f57d4c2a03.png?v=1700635270&width=600",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "melgeek": {
+    "page": "https://www.melgeek.cn/",
+    "asset_url": "https://cdn.melgeek.cn/melgeek_theme_website/static/src/images/logo_text.svg",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "iqunix": {
+    "page": "https://iqunix.com/",
+    "asset_url": "https://iqunix.com/cdn/shop/files/1000_x_1000_696bcc1b-1e3a-4fd5-9bca-c7287ca009ca.png?v=1736389095&width=500",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "hecate": {
+    "page": "https://www.edifier.com/cn/index.html",
+    "asset_url": "https://hecategaming.com/cdn/shop/files/HECATE_LOGO_3.png?v=1700020798&width=280",
+    "preparation": "官网标志，裁去空白并适配深色背景；离线多尺寸 PNG。",
+    "retrieved": "2026-10-19"
+  },
+  "edifier": {
+    "page": "https://www.edifier.com/global/",
+    "asset_url": "https://new-edifier-us-oss.edifier.com/images/20260811/152b1a262bcf8f8a99c9f001d0f08bc5.png",
+    "preparation": "官方站点图标，保留原始底色与形状，离线多尺寸 PNG。",
+    "retrieved": "2026-10-20"
+  }
+}
