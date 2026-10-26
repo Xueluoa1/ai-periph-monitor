@@ -25,6 +25,7 @@ from typing import Callable, Optional
 import hid_win as hw
 import darkrim_proto as drp
 import peripheral_protocols as peripheral
+import jbl_smart_tx as jbl
 import am_battery
 import gravastar_k1 as k1
 import wireless_battery as wireless
@@ -1402,6 +1403,7 @@ def _read_battery_unlocked(iface: HidInterface, listen_seconds: float = 3.0,
                            ) -> list[BatteryResult]:
     """按顺序跑所有策略，返回所有尝试记录（第一条 ok=True 的是结论）。"""
     attempts: list[BatteryResult] = []
+    if jbl.claims(iface):return [jbl.battery_read(iface, BatteryResult)]
     import xiaomi_mouse2 as xm
     if xm.claims(iface):return [xm.battery_read(iface,BatteryResult)]
     if is_unidentified_logged_receiver(iface):
@@ -1618,6 +1620,7 @@ def _is_candidate_interface(iface: HidInterface, specs: list[ProtocolSpec]) -> b
     """判断某个 HID 接口是否属于受支持的无线外设通信通道。"""
     if iface.vid == 0 or (iface.input_len == 0 and iface.output_len == 0 and iface.feature_len == 0):
         return False
+    if jbl.claims(iface):return jbl.candidate(iface)
     import xiaomi_mouse2 as xm
     if xm.claims(iface):return xm.matches(iface)
     if is_unidentified_logged_receiver(iface):

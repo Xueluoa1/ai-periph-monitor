@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 import tkinter as tk
 from tkinter import ttk
+from ui_switch_pixels import render as render_switch
 
 BG = '#f7f8fa'
 PANEL = '#ffffff'
@@ -330,9 +331,11 @@ class Switch(tk.Canvas):
         self.delete('all')
         s=self.factor
         color=ACCENT if self.variable.get() else SWITCH_OFF
-        self.create_line(12*s,20*s,32*s,20*s,width=22*s,fill=color,capstyle='round')
-        x=25 if self.variable.get() else 5
-        self.create_oval(x*s,12*s,(x+16)*s,28*s,fill='#ffffff',outline='')
+        def rgb(value):
+            return tuple(channel // 257 for channel in self.winfo_rgb(value))
+        pixels = render_switch(s, bool(self.variable.get()), rgb(self.cget('bg')), rgb(color))
+        self._image = tk.PhotoImage(master=self, data=pixels, format='PPM')
+        self.create_image(0, 0, anchor='nw', image=self._image)
         if self.focus_get() is self:
             self.create_rectangle(1,1,43*s,39*s,outline=ACCENT,width=1)
 

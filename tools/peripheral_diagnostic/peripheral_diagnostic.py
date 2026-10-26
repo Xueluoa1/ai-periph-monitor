@@ -40,7 +40,7 @@ from protocol_probes import BRAND_VIDS, HidDevice, report_ids_for, run_interface
 import hid_evidence
 
 VERSION = "1.5.0"
-BUILD_ID = '20261026-comprehensive'
+BUILD_ID = '20261026-m618xsd-antialias'
 WORKER_TIMEOUT_S = 18.0
 INVENTORY_TIMEOUT_S = 20.0
 TOTAL_TIMEOUT_S = 180.0
@@ -156,6 +156,8 @@ def worker_inventory(out_dir: Path, probe_all: bool, extra_vids: set[int]) -> in
             token = hashlib.sha256(iface.path.lower().encode()).hexdigest()[:12]
             rec["interface_id"] = f"iface_vid{iface.vid:04x}_pid{iface.pid:04x}_mi{mi or 'xx'}_col{col or 'xx'}_{token}"
             rec["brand_name"] = BRAND_VIDS.get(iface.vid, f"未知/其他 (0x{iface.vid:04X})")
+            if (iface.vid, iface.pid) == (0x320F, 0x221D):
+                rec["brand_name"] = '多彩 DELUX M618XSD（用户型号与官方驱动核对）'
             rec["vid_hex"] = f"0x{iface.vid:04X}"
             rec["pid_hex"] = f"0x{iface.pid:04X}"
             rec["usage_page_hex"] = f"0x{iface.usage_page:04X}"
@@ -176,6 +178,15 @@ def worker_inventory(out_dir: Path, probe_all: bool, extra_vids: set[int]) -> in
             if "InstanceId" in item:
                 item["instance_token"] = hashlib.sha256(item.pop("InstanceId").encode()).hexdigest()[:12]
         writer.write("inventory", "pnp_devices", devices=pnp_list)
+        if any((r['vid'],r['pid'])==(0x0ECB,0x214B) for r in records):
+            try:
+                import bt_battery
+                import jbl_smart_tx
+                devices=bt_battery.group_devices(bt_battery.list_bluetooth_devices(),connected_only=False)
+                writer.write('inventory','jbl_bluetooth_evidence',devices=jbl_smart_tx.bluetooth_evidence(devices),
+                             note='Separate Bluetooth devices; no inferred association with Smart Tx USB')
+            except Exception as exc:
+                writer.write('inventory','jbl_bluetooth_error',error=str(exc))
         (out_dir / "_interfaces.json").write_text(
             json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8"
         )
@@ -202,7 +213,8 @@ def worker_probe(out_dir: Path, iface_id: str) -> int:
         emit("open_start", vid=target["vid_hex"], pid=target["pid_hex"],
              brand=target["brand_name"], product=iface.product,
              usage_page=target["usage_page_hex"], usage=target["usage_hex"])
-        dev = HidDevice(iface,write=target['should_probe'])
+        import jbl_smart_tx
+        dev = HidDevice(iface,write=target['should_probe'] and not jbl_smart_tx.claims(iface))
         if not dev.open():
             emit("open_failed", error=dev.open_error)
             return 1
@@ -228,7 +240,9 @@ def worker_probe(out_dir: Path, iface_id: str) -> int:
                 value_caps=dev.all_value_caps(),
             )
             try:
-                if evidence is not None:hid_evidence.observe(dev,iface,evidence,emit)
+                if evidence is not None:
+                    options=dict(seconds=8.0,max_reports=256,max_unique=32) if jbl_smart_tx.matches(iface) else {}
+                    hid_evidence.observe(dev,iface,evidence,emit,**options)
             except (OSError,ValueError) as exc:
                 emit('passive_status',status='failed',error=str(exc))
             probe_summary = run_interface_probes(dev, iface, emit)

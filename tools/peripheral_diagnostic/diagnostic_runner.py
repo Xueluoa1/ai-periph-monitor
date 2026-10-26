@@ -65,6 +65,10 @@ def adaptation_report(folder, records, outcomes, m):
              '采集时间：' + datetime.now().astimezone().isoformat(timespec='seconds'),
              '', '本次不修改设备设置。请把完整 ZIP 交回进行适配。',
              '读取结果仅作候选；未验证任何写入功能。', '']
+    inventory_events=read_events(folder/'inventory.jsonl')
+    result['jbl_bluetooth_evidence']=[e for e in inventory_events if e.get('event') in ('jbl_bluetooth_evidence','jbl_bluetooth_error')]
+    for event in result['jbl_bluetooth_evidence']:
+        lines.append('JBL 蓝牙独立资料（不与 USB 自动关联）：'+json.dumps(event.get('devices',event.get('error')),ensure_ascii=False))
     for r in records:
         iid = r['interface_id']
         events = read_events(folder / (iid + '.jsonl'))
@@ -89,7 +93,8 @@ def adaptation_report(folder, records, outcomes, m):
         lines.append('  状态：' + outcome['status'] + ' | ' + iid)
         labels={'protocol_not_registered':'尚未收录协议，未发送猜测命令','query_no_response':'已发送查询，未收到回复',
                 'query_response_unparsed':'已有原始回复，尚未解析出电量','raw_reports_only':'已采集原始报文，不能直接认作电量',
-                'battery_candidate':'已得到电量候选值','not_queried':'未执行专用查询'}
+                'battery_candidate':'已得到电量候选值','not_queried':'未执行专用查询',
+                'passive_no_report':'已监听厂商接口，未收到主动报文；电量协议尚未确认'}
         lines.append('  查询：'+labels.get(entry['query_status'],entry['query_status']))
         for key, label in [('battery', '电量'), ('dpi', 'DPI'), ('polling_rate', '回报率'), ('lighting', '灯光')]:
             lines.append('  ' + label + '：' + (json.dumps(caps[key], ensure_ascii=False) if key in caps else '未确认'))

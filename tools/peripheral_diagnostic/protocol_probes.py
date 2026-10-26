@@ -25,6 +25,7 @@ import xiaomi_probe
 import weisheng_keyboard as wk
 import vxe_r1_pro_max as vxe
 import peripheral_protocols as battery_catalog
+import jbl_smart_tx as jbl
 import wireless_battery as wireless_catalog
 from hid_win import HidError, HidInterface, HidP_Feature, HidP_Input, HidP_Output
 
@@ -123,6 +124,8 @@ EmitFn = Callable[..., None]
 
 # 已知品牌 VID 与型号标识字典
 BRAND_VIDS: dict[int, str] = {
+    0x0ECB: "JBL / Harman",
+    0x3537: "GameSir (小鸡)",
     0x0B05: "ASUS ROG (玩家国度)",
     0x373B: "ATK / VXE (烈空/蜻蜓)",
     0x3554: "ATK / VXE / VGN / Scyrox / Lamzu / Pulsar (Compx方案)",
@@ -1253,6 +1256,12 @@ def run_interface_probes(dev: HidDevice, iface: HidInterface, emit: EmitFn) -> d
     dev.trace = emit
     if iface.reserved:
         emit('probe_skipped', reason='System keyboard/mouse input interface')
+        return results
+    if jbl.claims(iface):
+        merge_probe('jbl_smart_tx_evidence',{'identity':{'model':jbl.MODEL,
+            'interface_verified':jbl.matches(iface),'battery_protocol_verified':False,
+            'headphone_identity_verified':False,'note':jbl.LIMITATION}})
+        emit('probe_skipped',reason='Smart Tx USB battery command unconfirmed; passive evidence only')
         return results
     if wk.matches(iface):
         try:

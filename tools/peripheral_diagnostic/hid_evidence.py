@@ -63,22 +63,22 @@ def vendor_input_ids(evidence,iface):
     return {c['ReportID'] for c in inputs}
 
 
-def observe(dev,iface,evidence,emit):
+def observe(dev,iface,evidence,emit,*,seconds=1.5,max_reports=32,max_unique=8):
     ids=vendor_input_ids(evidence,iface)
     if not ids:
         emit('passive_status',status='skipped',reason='No exclusively vendor-defined input collection')
         return
-    seen=set();total=0;deadline=time.monotonic()+1.5
+    seen=set();total=0;deadline=time.monotonic()+seconds
     # Do not drain: the first queued status report may be the only battery evidence.
     # Bypass the wrapper trace until report ID is checked.
-    while total<32 and len(seen)<8 and time.monotonic()<deadline:
+    while total<max_reports and len(seen)<max_unique and time.monotonic()<deadline:
         raw=hw.HidDevice.read_input(dev,timeout_ms=100,length=iface.input_len)
         if not raw:continue
         total+=1
         if raw[0] not in ids or raw in seen:continue
         seen.add(raw)
         emit('rx',brand='vendor_passive',label='unsolicited_status',hex=raw.hex(),decoded=False)
-    emit('passive_status',status='captured' if seen else 'no_report',unique_reports=len(seen),
+    emit('passive_status',status='captured' if seen else 'no_report',unique_reports=len(seen),window_seconds=seconds,
          interpretation='Raw vendor data only; no inferred battery percentage')
 
 
@@ -89,5 +89,6 @@ def query_status(events,summary,worker_status):
     rx=any(e.get('event') in ('rx','transport_rx') for e in events)
     if tx:return 'query_response_unparsed' if rx else 'query_no_response'
     if rx:return 'raw_reports_only'
+    if 'jbl_smart_tx_evidence' in summary.get('probes_executed',[]):return 'passive_no_report'
     if summary.get('probes_executed',[])==['generic_safe_dump']:return 'protocol_not_registered'
     return 'not_queried'

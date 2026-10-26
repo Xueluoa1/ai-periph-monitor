@@ -11,6 +11,8 @@ import time
 from hid_win import HidDevice
 import weisheng_keyboard as wk
 import darmoshark_m3pro as dm
+import gamesir_g7 as g7
+import delux_m618xsd as m618
 
 
 @dataclass(frozen=True)
@@ -20,6 +22,8 @@ class Profile:
 
 
 CATALOG = {
+    (0x320F, 0x221D): Profile('delux_m618xsd', m618.MODEL),
+    (0x3537, 0x10B9): Profile('gamesir_g7', g7.MODEL),
     (0x1915, 0x0723): Profile('darmoshark_m3pro', '达摩鲨 Nordic 接收器（待读取配对型号）'),
     (0x320F, 0x5088): Profile('weisheng_keyboard', wk.MODEL),
     (0x260D, 0x1114): Profile('dareu', '达尔优 DAREU A950 PRO Mg 鼠标'),
@@ -49,6 +53,8 @@ def matches_interface(iface):
     if not p:
         return False
     page, usage = iface.usage_page, iface.usage
+    if p.protocol == 'delux_m618xsd':return m618.matches(iface)
+    if p.protocol == 'gamesir_g7':return g7.matches(iface)
     if p.protocol == 'weisheng_keyboard':return wk.matches(iface)
     if p.protocol == 'darmoshark_m3pro':return dm.matches(iface)
     if p.protocol == 'dareu':
@@ -149,6 +155,8 @@ _io_lock = threading.Lock()
 
 
 def _active_read(dev, iface, protocol):
+    if protocol == 'delux_m618xsd':return m618.read(dev,iface)
+    if protocol == 'gamesir_g7':return g7.read(dev,iface)
     if protocol == 'darmoshark_m3pro':return dm.read(dev,iface)
     if protocol == 'weisheng_keyboard':return wk.read(dev,iface)
     if protocol == 'lofree':

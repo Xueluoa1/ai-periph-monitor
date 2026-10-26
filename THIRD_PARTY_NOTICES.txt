@@ -87,3 +87,9 @@ ZCOOL QingKe HuangYou - bundled font
 Source: https://github.com/google/fonts/tree/main/ofl/zcoolqingkehuangyou
 License: SIL Open Font License 1.1; full copyright and license in fonts/OFL.txt.
 The unmodified font is loaded privately by the app, not installed system-wide.
+
+
+2026-10-26 protocol reference additions (independent wire-format implementations):
+- GameSir G7 Pro: https://github.com/broroeror/gamesir-linux-tools ; only protocol field references, no Linux driver/configuration/firmware code bundled.
+- DELUX M618XSD: official Version 1.0 driver protocol analysis; https://www.deluxworld.com/en-service.html?title=M618XSD ; vendor installer and firmware not redistributed.
+- JBL Smart Tx: official manual and public protocol comparisons; see docs/适配说明-JBL.md. USB battery decoding is not implemented.
