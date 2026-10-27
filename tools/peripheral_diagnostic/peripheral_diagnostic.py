@@ -40,7 +40,7 @@ from protocol_probes import BRAND_VIDS, HidDevice, report_ids_for, run_interface
 import hid_evidence
 
 VERSION = "1.5.0"
-BUILD_ID = '20261026-m618xsd-antialias'
+BUILD_ID = '20261027-ak820maxplus'
 WORKER_TIMEOUT_S = 18.0
 INVENTORY_TIMEOUT_S = 20.0
 TOTAL_TIMEOUT_S = 180.0
@@ -158,6 +158,8 @@ def worker_inventory(out_dir: Path, probe_all: bool, extra_vids: set[int]) -> in
             rec["brand_name"] = BRAND_VIDS.get(iface.vid, f"未知/其他 (0x{iface.vid:04X})")
             if (iface.vid, iface.pid) == (0x320F, 0x221D):
                 rec["brand_name"] = '多彩 DELUX M618XSD（用户型号与官方驱动核对）'
+            if (iface.vid, iface.pid) == (0x1A2C, 0x8FFF):
+                rec["brand_name"] = 'XY 2.4G 键盘接收器（含黑爵 AK820 Max Plus，共用 ID）'
             rec["vid_hex"] = f"0x{iface.vid:04X}"
             rec["pid_hex"] = f"0x{iface.pid:04X}"
             rec["usage_page_hex"] = f"0x{iface.usage_page:04X}"

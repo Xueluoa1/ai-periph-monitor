@@ -7,6 +7,17 @@ import protocol_probes as probes
 from test_diagnostic import iface
 
 class EvidenceTests(unittest.TestCase):
+    def test_ak820_log_interface_automatically_queries_battery(self):
+        import ajazz_ak820 as k
+        d=iface(vid=0x1A2C,pid=0x8FFF,usage_page=0xFF02,usage=2,input_len=65,output_len=65,feature_len=0)
+        raw=bytearray(k.BATTERY_QUERY);raw[6:8]=bytes((73,1))
+        dev=Mock();dev.read_input.return_value=bytes(raw)
+        with patch.object(probes,'probe_other_and_generic',return_value={}):
+            result=probes.run_interface_probes(dev,d,Mock())
+        self.assertEqual(result['capabilities']['battery']['level_percent'],73)
+        self.assertEqual(result['capabilities']['battery']['status'],'unknown')
+        dev.write_output.assert_called_once_with(k.BATTERY_QUERY,use_hidd=False)
+
     def test_m618xsd_automatically_queries_online_and_battery(self):
         import delux_m618xsd as m
         d=iface(vid=0x320F,pid=0x221D,usage_page=0xFF1C,usage=0x92,input_len=64,output_len=64,feature_len=0)
