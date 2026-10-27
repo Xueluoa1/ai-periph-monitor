@@ -40,7 +40,7 @@ from protocol_probes import BRAND_VIDS, HidDevice, report_ids_for, run_interface
 import hid_evidence
 
 VERSION = "1.5.0"
-BUILD_ID = '20261027-remove-log-import'
+BUILD_ID = '20261027-wireless-battery'
 WORKER_TIMEOUT_S = 18.0
 INVENTORY_TIMEOUT_S = 20.0
 TOTAL_TIMEOUT_S = 180.0

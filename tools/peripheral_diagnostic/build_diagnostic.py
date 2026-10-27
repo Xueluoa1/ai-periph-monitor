@@ -27,6 +27,7 @@ def main():
         z.write(target, target.name)
         z.write(source / '使用说明与适配指南.md', '使用说明.md')
         z.write(root / 'docs' / '适配核对-用户型号清单.md', '适配核对-用户型号清单.md')
+        z.write(root / 'docs' / '适配说明-无线电量扩展.md', '适配说明-无线电量扩展.md')
     print(target)
 
 

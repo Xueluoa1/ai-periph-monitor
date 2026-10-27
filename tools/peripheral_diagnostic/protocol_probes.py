@@ -27,6 +27,7 @@ import vxe_r1_pro_max as vxe
 import peripheral_protocols as battery_catalog
 import jbl_smart_tx as jbl
 import wireless_battery as wireless_catalog
+import receiver_battery as receiver_catalog
 from hid_win import HidError, HidInterface, HidP_Feature, HidP_Input, HidP_Output
 
 
@@ -122,6 +123,12 @@ EmitFn = Callable[..., None]
 
 # 已知品牌 VID 与型号标识字典
 BRAND_VIDS: dict[int, str] = {
+    0x1038: "SteelSeries（赛睿）",
+    0x03F0: "HP / HyperX",
+    0x1E71: "NZXT",
+    0x3434: "Keychron",
+    0x3770: "Hitscan",
+    0x33E4: "G-Wolves",
     0x0ECB: "JBL / Harman",
     0x3537: "GameSir (小鸡)",
     0x0B05: "ASUS ROG (玩家国度)",
@@ -1254,6 +1261,27 @@ def run_interface_probes(dev: HidDevice, iface: HidInterface, emit: EmitFn) -> d
     dev.trace = emit
     if iface.reserved:
         emit('probe_skipped', reason='System keyboard/mouse input interface')
+        return results
+    if receiver_catalog.profile_for(iface):
+        profile = receiver_catalog.profile_for(iface)
+        merge_probe('wireless_receiver_identity', {'identity': {
+            'model': profile.name, 'protocol': profile.protocol,
+            'interface_verified': receiver_catalog.matches(iface),
+            'hardware_verified': False}})
+        if not receiver_catalog.matches(iface):
+            emit('probe_skipped', reason='Known receiver, unrelated HID collection')
+            return results
+        try:
+            reading = receiver_catalog.query(dev, iface)
+            merge_probe('wireless_receiver_battery', {})
+            if reading is not None:
+                value = {'level_percent': reading.level, 'level_label': reading.label,
+                         'raw_level': reading.raw_level, 'status': reading.status,
+                         'voltage_mv': reading.voltage_mv, 'model': profile.name}
+                merge_probe('wireless_receiver_result', {'battery': value})
+                emit('decoded', brand=profile.protocol, query='battery', value=value)
+        except (OSError, ValueError) as exc:
+            emit('query_error', brand=profile.protocol, message=str(exc))
         return results
     if jbl.claims(iface):
         merge_probe('jbl_smart_tx_evidence',{'identity':{'model':jbl.MODEL,

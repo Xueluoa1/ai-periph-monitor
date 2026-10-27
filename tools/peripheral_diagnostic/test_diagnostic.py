@@ -23,6 +23,19 @@ def iface(**kwargs):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_wireless_receiver_query_and_unrelated_collection(self):
+        d=iface(vid=0x1038,pid=0x22A1,usage_page=0xFFC0,usage=1)
+        emit=Mock()
+        with patch.object(probes.receiver_catalog,'query',return_value=probes.receiver_catalog.Reading(42)) as query:
+            result=probes.run_interface_probes(Mock(),d,emit)
+            self.assertEqual(result['capabilities']['battery']['level_percent'],42)
+            query.assert_called_once()
+        d.usage_page=0xFF13
+        with patch.object(probes.receiver_catalog,'query') as query:
+            result=probes.run_interface_probes(Mock(),d,emit)
+            query.assert_not_called()
+            self.assertFalse(result['capabilities']['identity']['interface_verified'])
+
     def test_pro_max_capture_decodes_one_sensor_and_indicator(self):
         device=iface(vid=0x3554,pid=0xF58A,usage_page=0xFF02,usage=2,input_len=17,output_len=17)
         eeprom={0:'01540451035200550055',10:'0154',12:'07070047',16:'0f0f0037',20:'1f1f0017',24:'3f3f00d7',

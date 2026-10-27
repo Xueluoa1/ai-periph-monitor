@@ -29,6 +29,7 @@ import jbl_smart_tx as jbl
 import am_battery
 import gravastar_k1 as k1
 import wireless_battery as wireless
+import receiver_battery as receivers
 from hid_win import HidDevice, HidError, HidInterface, HidP_Feature, HidP_Input
 
 
@@ -1403,6 +1404,7 @@ def _read_battery_unlocked(iface: HidInterface, listen_seconds: float = 3.0,
                            ) -> list[BatteryResult]:
     """按顺序跑所有策略，返回所有尝试记录（第一条 ok=True 的是结论）。"""
     attempts: list[BatteryResult] = []
+    if receivers.profile_for(iface):return [receivers.read(iface, BatteryResult)]
     if jbl.claims(iface):return [jbl.battery_read(iface, BatteryResult)]
     import xiaomi_mouse2 as xm
     if xm.claims(iface):return [xm.battery_read(iface,BatteryResult)]
@@ -1621,6 +1623,7 @@ def _is_candidate_interface(iface: HidInterface, specs: list[ProtocolSpec]) -> b
     """判断某个 HID 接口是否属于受支持的无线外设通信通道。"""
     if iface.vid == 0 or (iface.input_len == 0 and iface.output_len == 0 and iface.feature_len == 0):
         return False
+    if receivers.profile_for(iface):return receivers.matches(iface)
     if jbl.claims(iface):return jbl.candidate(iface)
     import xiaomi_mouse2 as xm
     if xm.claims(iface):return xm.matches(iface)
@@ -1822,6 +1825,7 @@ def discover_and_read_all(include_bt: bool = False, presence: Optional[dict] = N
                 r_obj.error = "没有找到可用的协议读取方式"
             elif res.ok:
                 r_obj.level = res.level
+                r_obj.level_label = res.extra.get('level_label', '')
                 r_obj.status = res.status_text
                 r_obj.voltage_mv = res.voltage_mv
                 r_obj.detail = res.source

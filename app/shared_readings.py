@@ -64,11 +64,12 @@ def readings_from(snapshot):
             raise ValueError('Invalid device key')
         if r.level is not None and (type(r.level) is not int or not 0 <= r.level <= 100):
             raise ValueError('Invalid percentage')
-        if r.level_label not in ('', '空', '低', '中', '满'):
+        if r.level_label not in ('', '空', '低', '中', '满',
+                                 '0/4 档', '1/4 档', '2/4 档', '3/4 档', '4/4 档'):
             raise ValueError('Invalid battery category')
         if r.updated_at is not None and not isinstance(r.updated_at, (int, float)):
             raise ValueError('Invalid timestamp')
-        if r.stale and r.level is not None:
+        if r.stale and (r.level is not None or r.level_label):
             stamp = time.strftime('%m-%d %H:%M:%S', time.localtime(r.updated_at)) if r.updated_at else '时间未知'
             r = replace(r, status=f'上次电量 · {stamp}',
                         detail=f'{r.detail} · {r.error or "等待设备更新"}'.strip(' ·'))
@@ -89,7 +90,8 @@ def merge_snapshot(previous, incoming, now, error='', presence=None):
         sleeping = '休眠' in reading.status or reading.stale
         if (valid or reading.level_label) and not sleeping:
             old[reading.key] = asdict(replace(reading, updated_at=now, stale=False))
-        elif cached is not None and cached.get('level') is not None:
+        elif cached is not None and (cached.get('level') is not None or
+                                     cached.get('level_label') and not reading.key.startswith('XINPUT:')):
             cached.update(stale=True, error=reading.error or reading.status or '本次读取未成功')
             # Custom model names can change while a mouse is asleep.
             cached['title'] = reading.title
@@ -117,7 +119,7 @@ def merge_snapshot(previous, incoming, now, error='', presence=None):
                 # A slot can be reassigned: never retain its old category as live.
                 old[key].update(level_label='', error=error or presence.get('xinput_error') or '等待手柄更新')
                 continue
-            old[key].update(stale=old[key].get('level') is not None,
+            old[key].update(stale=old[key].get('level') is not None or bool(old[key].get('level_label')),
                             error=error or (presence.get('bt_error') if bt else '') or
                                   '设备仍存在或连接状态暂时未知，等待电量更新')
         else:

@@ -95,3 +95,12 @@ The unmodified font is loaded privately by the app, not installed system-wide.
 - JBL Smart Tx: official manual and public protocol comparisons; see docs/适配说明-JBL.md. USB battery decoding is not implemented.
 
 2026-10-27: AJAZZ AK820 Max Plus XY receiver battery wire format independently implemented from driver static analysis; vendor installer/firmware not redistributed. Source, distributor mirror provenance and verification limits: docs/适配说明-AK820MaxPlus.md.
+
+Wireless battery protocol references (2026-10-27)
+Independent implementation from device IDs, query formats and field definitions.
+No third-party driver/runtime source is bundled for these additions.
+G-Wolves official web driver: https://mouse.xyz/
+HeadsetControl: https://github.com/Sapd/HeadsetControl
+HaloBattery capture research: https://github.com/HeyOkay/HaloBattery
+Keychron battery protocol: https://github.com/csutcliff/keychron-battery-dkms
+Hitscan battery captures: https://github.com/sopparus/hitscan-battery
