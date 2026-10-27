@@ -76,7 +76,6 @@ class HidDevice(hw.HidDevice):
     def get_feature(self, report_id: int, length: Optional[int] = None) -> Optional[bytes]:
         try:
             raw = self.get_feature_report(report_id, length)
-            self.trace('transport_rx', method='get_feature', report_id=report_id, hex=raw.hex())
             return raw
         except Exception as exc:
             self.trace('transport_error', method='get_feature', report_id=report_id, error=str(exc))
@@ -93,7 +92,6 @@ class HidDevice(hw.HidDevice):
 
     def set_feature(self, data: bytes) -> bool:
         try:
-            self.trace('transport_tx', method='set_feature_query', hex=data.hex())
             self.set_feature_report(data)
             return True
         except Exception as exc:

@@ -258,7 +258,7 @@ class TrayApp:
             if r.key not in self._device_uids:
                 self._device_uids[r.key] = len(self._device_uids) + 2
             idx = self._device_uids[r.key]
-            info = r.status if r.ok else (r.error or "未知")
+            info = r.status if r.ok else (f'电量档位：{r.level_label}（无百分比）' if r.level_label else r.error or "未知")
             if r.ok and not getattr(r, 'stale', False) and getattr(r, 'updated_at', None):
                 if '系统缓存' not in info:
                     info = f"{info} · {time.strftime('%m-%d %H:%M:%S', time.localtime(r.updated_at))} 更新"

@@ -26,6 +26,7 @@ def main():
     with zipfile.ZipFile(release / '多品牌外设诊断工具-v1.5-便携版.zip', 'w', zipfile.ZIP_DEFLATED) as z:
         z.write(target, target.name)
         z.write(source / '使用说明与适配指南.md', '使用说明.md')
+        z.write(root / 'docs' / '适配核对-用户型号清单.md', '适配核对-用户型号清单.md')
     print(target)
 
 

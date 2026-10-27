@@ -66,6 +66,9 @@ def adaptation_report(folder, records, outcomes, m):
              '', '本次不修改设备设置。请把完整 ZIP 交回进行适配。',
              '读取结果仅作候选；未验证任何写入功能。', '']
     inventory_events=read_events(folder/'inventory.jsonl')
+    result['system_battery_evidence'] = read_events(folder / 'system_battery.jsonl')
+    for event in result['system_battery_evidence']:
+        lines.append('系统电量资料（蓝牙 / XInput；不与 USB 自动关联）：' + json.dumps(event, ensure_ascii=False))
     result['jbl_bluetooth_evidence']=[e for e in inventory_events if e.get('event') in ('jbl_bluetooth_evidence','jbl_bluetooth_error')]
     for event in result['jbl_bluetooth_evidence']:
         lines.append('JBL 蓝牙独立资料（不与 USB 自动关联）：'+json.dumps(event.get('devices',event.get('error')),ensure_ascii=False))
@@ -153,6 +156,11 @@ def run(args, m):
             outcomes.append(run_child(m, flags, folder, 'inventory', m.INVENTORY_TIMEOUT_S))
             if (folder / '_interfaces.json').exists():
                 records = json.loads((folder / '_interfaces.json').read_text(encoding='utf-8'))
+            remaining = deadline - time.monotonic()
+            if remaining >= 1:
+                print('  采集 Windows 蓝牙电量和 XInput 手柄档位…', flush=True)
+                outcomes.append(run_child(m, ['--worker', 'system', '--out', str(folder)],
+                                          folder, 'system', min(15.0, remaining)))
             targets = sorted(records,key=lambda r:not r['should_probe']) if not args.inventory_only else []
             print(f'[2/3] 发现 {len(records)} 个接口，采集能力表并查询已匹配的控制接口…', flush=True)
             for i, r in enumerate(targets, 1):

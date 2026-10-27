@@ -275,7 +275,7 @@ def group_devices(devices,connected_only=True):
         sources.sort(key=lambda d:(d.connected is not True,not (d.is_handsfree or d.is_ble),d.instance_id))
         source=sources[0] if sources else None
         cached=bool(source and source.connected is not True)
-        reason=('Windows 系统缓存电量；耳机已连接，电量服务节点未连接，上报时间未知'
+        reason=('Windows 系统缓存电量；设备已连接，电量服务节点未连接，上报时间未知'
                 if cached else source.reason if source else '已连接，但 Windows 尚未提供电量')
         headset=any(d.is_handsfree or '{0000110B-' in d.instance_id.upper() or
                     '{0000111E-' in d.instance_id.upper() for d in nodes)

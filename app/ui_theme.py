@@ -137,6 +137,10 @@ def scale(widget):
 
 def device_kind(title, headset=False):
     title = title.lower()
+    if any(k in title for k in ('xinput', 'xbox', 'controller', 'gamepad', '手柄')):
+        return 'controller'
+    if any(k in title for k in ('音箱', '音响', 'speaker', 'tribit')):
+        return 'speaker'
     if headset or any(k in title for k in ('headset', 'headphone', '耳机', 'earphone', 'buds', 'darkrim')):
         return 'headset'
     if any(k in title for k in ('keyboard', '键盘', 'cyberboard', 'azoth', 'falchion', 'scope')):
@@ -289,6 +293,15 @@ class DeviceGlyph(tk.Canvas):
             for y in (9,12):
                 for x in (6,11,16): line((x,y,x+1,y))
             line((7,16,17,16))
+        elif kind == 'controller':
+            line((4,7,8,5,16,5,20,7,22,19,18,20,15,16,9,16,6,20,2,19,4,7))
+            line((6,10,10,10));line((8,8,8,12))
+            for x,y in ((17,9),(19,11)):
+                self.create_oval((x-1)*s,(y-1)*s,(x+1)*s,(y+1)*s,fill=color,outline='')
+        elif kind == 'speaker':
+            self.create_rectangle(5*s,2*s,19*s,22*s,outline=color,width=1.6*s)
+            self.create_oval(8*s,10*s,16*s,18*s,outline=color,width=1.6*s)
+            self.create_oval(11*s,5*s,13*s,7*s,fill=color,outline='')
         elif kind == 'headset':
             self.create_arc(3*s,2*s,21*s,20*s,start=0,extent=180,style='arc',outline=color,width=2*s)
             for x in (3,17):

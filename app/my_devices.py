@@ -42,6 +42,7 @@ class Reading:
     extra: str = ""
     key: str = ""
     stale: bool = False
+    level_label: str = ""
 
     @property
     def ok(self) -> bool:
@@ -74,6 +75,7 @@ def display_readings(discovered) -> list[Reading]:
             extra=d.extra,
             key=d.key,
             stale=d.stale,
+            level_label=d.level_label,
         ))
     return out
 
@@ -88,6 +90,8 @@ def cli_once() -> None:
             print(f"{r.title} ({r.subtitle}): {r.level}%{st}   {r.detail}")
             if r.extra:
                 print(f"    {r.extra}")
+        elif r.level_label:
+            print(f"{r.title}: 电量档位 {r.level_label} · {r.detail}")
         else:
             print(f"{r.title} ({r.subtitle}): 读取失败 —— {r.error}")
 

@@ -64,6 +64,8 @@ def readings_from(snapshot):
             raise ValueError('Invalid device key')
         if r.level is not None and (type(r.level) is not int or not 0 <= r.level <= 100):
             raise ValueError('Invalid percentage')
+        if r.level_label not in ('', '空', '低', '中', '满'):
+            raise ValueError('Invalid battery category')
         if r.updated_at is not None and not isinstance(r.updated_at, (int, float)):
             raise ValueError('Invalid timestamp')
         if r.stale and r.level is not None:
@@ -85,7 +87,7 @@ def merge_snapshot(previous, incoming, now, error='', presence=None):
         cached = old.get(reading.key)
         valid = type(reading.level) is int and 0 <= reading.level <= 100
         sleeping = '休眠' in reading.status or reading.stale
-        if valid and not sleeping:
+        if (valid or reading.level_label) and not sleeping:
             old[reading.key] = asdict(replace(reading, updated_at=now, stale=False))
         elif cached is not None and cached.get('level') is not None:
             cached.update(stale=True, error=reading.error or reading.status or '本次读取未成功')
@@ -106,10 +108,15 @@ def merge_snapshot(previous, incoming, now, error='', presence=None):
         # could not be checked reliably in this scan.
         bt = key.startswith('BT:')
         retained = (error or
+                    (key.startswith('XINPUT:') and presence.get('xinput_error')) or
                     (bt and (presence.get('bt_error') or key in presence.get('bt_unknown', ()))) or
                     (not bt and (key in presence.get('hid_keys', ()) or
                                  key[:9] in presence.get('hid_unknown', ()))))
         if retained:
+            if key.startswith('XINPUT:'):
+                # A slot can be reassigned: never retain its old category as live.
+                old[key].update(level_label='', error=error or presence.get('xinput_error') or '等待手柄更新')
+                continue
             old[key].update(stale=old[key].get('level') is not None,
                             error=error or (presence.get('bt_error') if bt else '') or
                                   '设备仍存在或连接状态暂时未知，等待电量更新')

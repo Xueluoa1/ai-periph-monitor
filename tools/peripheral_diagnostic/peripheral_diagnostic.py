@@ -40,7 +40,7 @@ from protocol_probes import BRAND_VIDS, HidDevice, report_ids_for, run_interface
 import hid_evidence
 
 VERSION = "1.5.0"
-BUILD_ID = '20261027-ak820maxplus'
+BUILD_ID = '20261027-remove-log-import'
 WORKER_TIMEOUT_S = 18.0
 INVENTORY_TIMEOUT_S = 20.0
 TOTAL_TIMEOUT_S = 180.0
@@ -180,18 +180,20 @@ def worker_inventory(out_dir: Path, probe_all: bool, extra_vids: set[int]) -> in
             if "InstanceId" in item:
                 item["instance_token"] = hashlib.sha256(item.pop("InstanceId").encode()).hexdigest()[:12]
         writer.write("inventory", "pnp_devices", devices=pnp_list)
-        if any((r['vid'],r['pid'])==(0x0ECB,0x214B) for r in records):
-            try:
-                import bt_battery
-                import jbl_smart_tx
-                devices=bt_battery.group_devices(bt_battery.list_bluetooth_devices(),connected_only=False)
-                writer.write('inventory','jbl_bluetooth_evidence',devices=jbl_smart_tx.bluetooth_evidence(devices),
-                             note='Separate Bluetooth devices; no inferred association with Smart Tx USB')
-            except Exception as exc:
-                writer.write('inventory','jbl_bluetooth_error',error=str(exc))
         (out_dir / "_interfaces.json").write_text(
             json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8"
         )
+    finally:
+        writer.close()
+    return 0
+
+
+def worker_system(out_dir: Path) -> int:
+    import system_battery_evidence
+    run_id = json.loads((out_dir / 'run.json').read_text(encoding='utf8'))['run_id']
+    writer = JsonlWriter(out_dir / 'system_battery.jsonl', run_id)
+    try:
+        system_battery_evidence.collect(lambda event, **fields: writer.write('system', event, **fields))
     finally:
         writer.close()
     return 0
@@ -447,6 +449,8 @@ def main() -> int:
         out_dir = Path(args.out)
         if args.worker == "inventory":
             return worker_inventory(out_dir, args.all, extra_vids)
+        if args.worker == 'system':
+            return worker_system(out_dir)
         return worker_probe(out_dir, args.worker)
 
     if args.diff:

@@ -327,13 +327,15 @@ def run_widget() -> int:
                 from ui_connection import reading_color
                 color = reading_color(reading.level, getattr(reading, 'key', ''))
                 bolt = "⚡" if reading.ok and "充电" in (reading.status or "") else ""
-                percent = f"{reading.level}%{bolt}" if reading.ok else "--"
+                percent = f"{reading.level}%{bolt}" if reading.ok else reading.level_label or "--"
                 parts = []
                 if reading.ok:
                     if reading.status and reading.status not in ("未知", "状态未知"):
                         parts.append(reading.status)
                     if reading.voltage_mv:
                         parts.append(f"{reading.voltage_mv}mV")
+                elif reading.level_label:
+                    parts.append('电量档位 · 无百分比')
                 else:
                     parts.append(reading.error[:18] if reading.error else "未连接")
                 sub = " · ".join(parts) or "在线"

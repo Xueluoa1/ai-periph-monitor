@@ -1604,6 +1604,7 @@ class DiscoveredReading:
     is_headset: bool = False      # 是否使用耳机底板图标
     updated_at: Optional[float] = None  # Last successful shared acquisition.
     stale: bool = False          # Retained battery, not a new measurement.
+    level_label: str = ""         # Discrete category, never a fabricated percentage.
 
     @property
     def ok(self) -> bool:
@@ -1867,20 +1868,23 @@ def discover_and_read_all(include_bt: bool = False, presence: Optional[dict] = N
             for bdev in bb.connected_devices(presence=presence):
                 key = f"BT:{bdev.instance_id}"
                 bt_title = custom_models.get(key) or custom_models.get(f"BT:{bdev.source_instance_id}") or bdev.name
+                speaker = any(word in bdev.name.casefold() for word in ('tribit', 'speaker', '音箱', '音响'))
                 readings.append(DiscoveredReading(
                     key=key,
                     title=bt_title,
-                    subtitle="蓝牙耳机" if bdev.headset else "蓝牙无线连接",
+                    subtitle="蓝牙音箱" if speaker else "蓝牙耳机" if bdev.headset else "蓝牙无线连接",
                     level=bdev.battery,
                     status="系统缓存" if bdev.cached else "已连接",
                     detail=bdev.reason,
                     error=bdev.reason if bdev.battery is None else '',
-                    is_headset=bdev.headset,
+                    is_headset=bdev.headset and not speaker,
                 ))
         except Exception as exc:
             if presence is not None:
                 presence['bt_error'] = f'蓝牙连接状态读取失败：{exc}'
 
+    import xinput_battery
+    readings.extend(xinput_battery.readings(custom_models, presence))
     return readings
 
 

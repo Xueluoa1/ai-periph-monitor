@@ -64,7 +64,7 @@ class DeviceCard:
         kind=ui.device_kind(r.title+' '+r.subtitle)
         self.icon.show(r.title,kind)
         self.lab_title.configure(text=r.title.lstrip('🖱️⌨️🎧 '))
-        device_type={'mouse':'鼠标','keyboard':'键盘','headset':'耳机'}[kind]
+        device_type={'mouse':'鼠标','keyboard':'键盘','headset':'耳机','controller':'手柄','speaker':'音箱'}[kind]
         self.lab_sub.configure(text=r.subtitle if device_type in r.subtitle else f'{device_type} · {r.subtitle}' if r.subtitle else device_type)
         self.btn_edit.configure(state='normal' if r.key else 'disabled')
         self.level=r.level
@@ -77,13 +77,19 @@ class DeviceCard:
             self.lab_cached.configure(text='上次电量' if sleep else '充电中' if '充电' in status else '')
             self.lab_detail.configure(text=r.detail)
             self.lab_extra.configure(text=r.extra)
+        elif r.level_label:
+            self.lab_level.configure(text=r.level_label,foreground=ui.FG)
+            self.lab_status.configure(text='电量档位',foreground=ui.MUTED)
+            self.lab_cached.configure(text='')
+            self.lab_detail.configure(text=r.detail)
+            self.lab_extra.configure(text=r.extra)
         else:
             self.lab_level.configure(text='--',foreground=ui.MUTED)
             self.lab_status.configure(text='暂无读数' if r.key else '',foreground=ui.MUTED)
             self.lab_cached.configure(text='')
             self.lab_detail.configure(text=r.error or '正在读取设备信息…')
             self.lab_extra.configure(text=r.extra)
-        self.time_label.configure(text='系统缓存 · 上报时间未知' if '系统缓存' in status else '缓存读数' if sleep else f'{time.strftime("%H:%M:%S")} 更新' if r.ok else '等待更新')
+        self.time_label.configure(text='系统缓存 · 上报时间未知' if '系统缓存' in status else '缓存读数' if sleep else f'{time.strftime("%H:%M:%S")} 更新' if r.ok or r.level_label else '等待更新')
         for label in (self.lab_detail,self.lab_extra):
             if label.cget('text'):
                 label.pack(anchor='w',fill='x',pady=(0,5),before=self.separator)

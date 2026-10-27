@@ -32,6 +32,8 @@ def transport_for_key(key):
     """Use discovery identity, never a user-editable product/brand name."""
     if (key or '').upper().startswith('BT:'):
         return 'bluetooth'
+    if (key or '').upper().startswith('XINPUT:'):
+        return 'unknown'
     return 'usb' if key else 'unknown'
 
 

@@ -7,6 +7,27 @@ import protocol_probes as probes
 from test_diagnostic import iface
 
 class EvidenceTests(unittest.TestCase):
+    def test_unknown_receiver_does_not_query_removed_log_bindings(self):
+        d=iface(vid=0x1A2C,pid=0xEE01,usage_page=0xFF02,usage=2,input_len=65,output_len=65,feature_len=0)
+        dev=Mock();emit=Mock()
+        with patch.object(probes,'probe_other_and_generic',return_value={}):
+            result=probes.run_interface_probes(dev,d,emit)
+        dev.write_output.assert_not_called()
+        dev.set_feature_report.assert_not_called()
+        self.assertNotIn('battery',result['capabilities'])
+        self.assertTrue(any(c.args[0]=='probe_skipped' for c in emit.call_args_list))
+
+    def test_feature_wrapper_logs_each_physical_operation_once(self):
+        dev=object.__new__(probes.HidDevice);dev.trace=Mock()
+        with patch.object(hw.HidDevice,'get_feature_report',return_value=b'\x05\x00') as get, \
+             patch.object(hw.HidDevice,'set_feature_report') as send:
+            self.assertEqual(dev.get_feature(5,2),b'\x05\x00')
+            self.assertTrue(dev.set_feature(b'\x00\x01'))
+        get.assert_called_once();send.assert_called_once()
+        self.assertEqual([c.args[0] for c in dev.trace.call_args_list],['transport_rx','transport_tx'])
+
+
+
     def test_ak820_log_interface_automatically_queries_battery(self):
         import ajazz_ak820 as k
         d=iface(vid=0x1A2C,pid=0x8FFF,usage_page=0xFF02,usage=2,input_len=65,output_len=65,feature_len=0)
