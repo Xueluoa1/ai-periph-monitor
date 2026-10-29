@@ -17,6 +17,9 @@ import device_io
 import tray_common as tc
 
 _memory = {}
+BATTERY_LABELS = frozenset(('', '空', '低', '中', '满')) | frozenset(
+    f'{n}/{total} 档' for total in (4, 5) for n in range(total+1)
+) | frozenset(f'约 {n}%' for n in range(0, 101, 5))
 
 
 def snapshot_path():
@@ -64,8 +67,7 @@ def readings_from(snapshot):
             raise ValueError('Invalid device key')
         if r.level is not None and (type(r.level) is not int or not 0 <= r.level <= 100):
             raise ValueError('Invalid percentage')
-        if r.level_label not in ('', '空', '低', '中', '满',
-                                 '0/4 档', '1/4 档', '2/4 档', '3/4 档', '4/4 档'):
+        if r.level_label not in BATTERY_LABELS:
             raise ValueError('Invalid battery category')
         if r.updated_at is not None and not isinstance(r.updated_at, (int, float)):
             raise ValueError('Invalid timestamp')

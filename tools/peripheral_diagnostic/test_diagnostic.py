@@ -23,6 +23,73 @@ def iface(**kwargs):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_new_betop_and_headset_routes_use_shared_queries(self):
+        cases = [
+            (dict(vid=0x20BC,pid=0x518D,usage_page=0x00FF,usage=3), '02155b0050010050',91),
+            (dict(vid=0x03F0,pid=0x08BE,usage_page=0xFF13,usage=0xFF00), '510233001a00',51),
+            (dict(vid=0x1038,pid=0x2269,usage_page=0xFFC0), 'b003003201',50),
+            (dict(vid=0x1038,pid=0x230A,usage_page=0xFFC0), 'b0000003035028',40),
+        ]
+        for values, raw, level in cases:
+            dev = Mock(); dev.read_input.return_value = bytes.fromhex(raw).ljust(64,b'\0')
+            result = probes.run_interface_probes(dev,iface(**values),Mock())
+            self.assertEqual(result['capabilities']['battery']['level_percent'],level)
+            dev.write_output.assert_called_once()
+            dev.get_feature_report.assert_not_called()
+
+    def test_eightbitdo_diagnostic_never_enables_enhanced_mode(self):
+        d = iface(vid=0x2DC8,pid=0x6009,usage_page=1,usage=5,output_len=0,
+                  path='hid#vid&00022dc8_pid&6009#bt')
+        dev = Mock()
+        dev.read_input.return_value = bytes.fromhex('040f807f7f80000000000000096014').ljust(64,b'\0')
+        result = probes.run_interface_probes(dev,d,Mock())
+        self.assertEqual(result['capabilities']['battery']['level_percent'],20)
+        self.assertEqual([call[0] for call in dev.mock_calls if call[0] != 'trace'],['read_input'])
+        d.path = 'hid#vid_2dc8&pid_6009#usb'
+        dev.reset_mock()
+        result = probes.run_interface_probes(dev,d,Mock())
+        self.assertFalse(result['capabilities']['identity']['interface_verified'])
+        self.assertEqual([call for call in dev.mock_calls if call[0] != 'trace'],[])
+
+    def test_passive_bluetooth_is_scheduled_without_output_or_feature(self):
+        d = iface(vid=0x2DC8,pid=0x6009,usage_page=1,usage=5,output_len=0,feature_len=0,
+                  path='hid#vid&00022dc8_pid&6009#bt')
+        self.assertTrue(m.should_probe_interface(vars(d),False,set()))
+        d.path = 'hid#vid_2dc8&pid_6009#usb'
+        self.assertFalse(m.should_probe_interface(vars(d),True,set()))
+        d.usage = 6
+        self.assertFalse(m.should_probe_interface(vars(d),True,set()))
+
+    def test_controller_and_mouse_queries_export_the_same_decoding(self):
+        cases=[
+            (dict(vid=0x20BC,pid=0x5191,usage_page=0xFF00,usage=3,product='BTP-KP20EB'),
+             '02155d0050010100',93,''),
+            (dict(vid=0x37D7,pid=0x2501,usage_page=0xFFA0,output_len=32),
+             '045aa5010100800200000000054501007045',None,'5/5 档'),
+            (dict(vid=0x37D7,pid=0x2401,usage_page=0xFFA0,output_len=33,input_len=33),
+             '005aa501010082020000000003',None,'3/5 档'),
+            (dict(vid=0x1038,pid=0x1838,usage_page=0xFFC0), 'd20b',50,'约 50%'),
+        ]
+        for values,raw,level,label in cases:
+            d=iface(**values);dev=Mock()
+            dev.read_input.return_value=bytes.fromhex(raw).ljust(d.input_len,b'\0')
+            result=probes.run_interface_probes(dev,d,Mock())
+            battery=result['capabilities']['battery']
+            self.assertEqual((battery['level_percent'],battery['level_label']),(level,label))
+            self.assertFalse(result['capabilities']['identity']['hardware_verified'])
+            dev.write_output.assert_called_once()
+            dev.set_feature_report.assert_not_called()
+
+    def test_cyclone_battery_is_automatically_queried(self):
+        d=iface(vid=0x3537,pid=0x100B,usage_page=0xFFF0,usage=0x40,feature_len=0)
+        dev=Mock();raw=bytearray(64);raw[0]=0x12;raw[1:5]=b'\x80'*4;raw[36]=73
+        dev.read_input.return_value=bytes(raw)
+        with patch.object(probes,'probe_other_and_generic',return_value={}):
+            result=probes.run_interface_probes(dev,d,Mock())
+        self.assertEqual(result['capabilities']['battery']['level_percent'],73)
+        self.assertIn('旋风2',result['capabilities']['battery']['model'])
+        dev.write_output.assert_called_once_with(bytes.fromhex('0f03')+bytes(62),use_hidd=False)
+
     def test_wireless_receiver_query_and_unrelated_collection(self):
         d=iface(vid=0x1038,pid=0x22A1,usage_page=0xFFC0,usage=1)
         emit=Mock()

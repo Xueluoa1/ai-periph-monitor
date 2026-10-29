@@ -28,6 +28,8 @@ def main():
         z.write(source / '使用说明与适配指南.md', '使用说明.md')
         z.write(root / 'docs' / '适配核对-用户型号清单.md', '适配核对-用户型号清单.md')
         z.write(root / 'docs' / '适配说明-无线电量扩展.md', '适配说明-无线电量扩展.md')
+        z.write(root / 'docs' / '适配说明-无线手柄与鼠标.md', '适配说明-无线手柄与鼠标.md')
+        z.write(root / 'docs' / '适配说明-北通八位堂与耳机.md', '适配说明-北通八位堂与耳机.md')
     print(target)
 
 

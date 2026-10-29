@@ -123,6 +123,7 @@ EmitFn = Callable[..., None]
 
 # 已知品牌 VID 与型号标识字典
 BRAND_VIDS: dict[int, str] = {
+    0x2DC8: "8BitDo（八位堂）",
     0x1038: "SteelSeries（赛睿）",
     0x03F0: "HP / HyperX",
     0x1E71: "NZXT",
@@ -1280,6 +1281,10 @@ def run_interface_probes(dev: HidDevice, iface: HidInterface, emit: EmitFn) -> d
                          'voltage_mv': reading.voltage_mv, 'model': profile.name}
                 merge_probe('wireless_receiver_result', {'battery': value})
                 emit('decoded', brand=profile.protocol, query='battery', value=value)
+            else:
+                emit('query_no_result', brand=profile.protocol, query='battery',
+                     reason=('No enhanced battery report; input mode was not changed'
+                             if profile.protocol.startswith('eightbitdo') else 'No valid battery reply'))
         except (OSError, ValueError) as exc:
             emit('query_error', brand=profile.protocol, message=str(exc))
         return results

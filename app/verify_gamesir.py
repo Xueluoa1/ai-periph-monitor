@@ -35,6 +35,19 @@ class FakeDevice:
 
 
 class GameSirTests(unittest.TestCase):
+    def test_cyclone_uses_its_own_query_and_model(self):
+        d=interface(pid=0x100B);dev=FakeDevice([report(64)])
+        self.assertTrue(catalog.matches_interface(d))
+        parsed,raw=g7.read(dev,d)
+        self.assertEqual(parsed,(64,'unknown',g7.MODELS[0x100B]))
+        self.assertEqual(dev.writes,[bytes.fromhex('0f03')+bytes(62)])
+
+    def test_failed_query_does_not_consume_old_telemetry(self):
+        dev=FakeDevice([report(100)])
+        with patch.object(dev,'write_output',return_value=False), patch.object(dev,'read_input') as read:
+            with self.assertRaises(OSError):g7.read(dev,interface(pid=0x100B))
+            read.assert_not_called()
+
     def test_exact_catalog_route(self):
         self.assertTrue(catalog.matches_interface(interface()))
         for changes in (dict(pid=0x109C), dict(vid=0x1234), dict(usage=1),

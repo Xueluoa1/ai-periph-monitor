@@ -34,13 +34,15 @@ import time
 import traceback
 import uuid
 import zipfile
+from types import SimpleNamespace
 
 from hid_win import HidInterface, enumerate_hid
 from protocol_probes import BRAND_VIDS, HidDevice, report_ids_for, run_interface_probes
 import hid_evidence
+import receiver_battery
 
 VERSION = "1.5.0"
-BUILD_ID = '20261027-wireless-battery'
+BUILD_ID = '20261029-gamepads-headsets'
 WORKER_TIMEOUT_S = 18.0
 INVENTORY_TIMEOUT_S = 20.0
 TOTAL_TIMEOUT_S = 180.0
@@ -121,6 +123,12 @@ def should_probe_interface(iface_rec: dict, probe_all: bool, extra_vids: set[int
     up = iface_rec["usage_page"]
     out_len = iface_rec["output_len"]
     feat_len = iface_rec["feature_len"]
+
+    # Known passive gamepad reports must also run when Output/Feature are absent.
+    if 'pid' in iface_rec:
+        candidate = SimpleNamespace(**iface_rec)
+        if receiver_battery.profile_for(candidate):
+            return receiver_battery.matches(candidate)
 
     # 跳过纯系统鼠标/键盘/多媒体输入通道 (无 Feature Report 且 Output<=4B 仅为 CapsLock 指示灯)
     if up in (0x0001, 0x000C) and feat_len == 0 and out_len <= 4:
@@ -218,7 +226,9 @@ def worker_probe(out_dir: Path, iface_id: str) -> int:
              brand=target["brand_name"], product=iface.product,
              usage_page=target["usage_page_hex"], usage=target["usage_hex"])
         import jbl_smart_tx
-        dev = HidDevice(iface,write=target['should_probe'] and not jbl_smart_tx.claims(iface))
+        profile = receiver_battery.profile_for(iface)
+        passive = profile is not None and profile.protocol.startswith('eightbitdo')
+        dev = HidDevice(iface,write=target['should_probe'] and not passive and not jbl_smart_tx.claims(iface))
         if not dev.open():
             emit("open_failed", error=dev.open_error)
             return 1

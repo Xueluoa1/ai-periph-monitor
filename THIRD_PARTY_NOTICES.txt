@@ -104,3 +104,21 @@ HeadsetControl: https://github.com/Sapd/HeadsetControl
 HaloBattery capture research: https://github.com/HeyOkay/HaloBattery
 Keychron battery protocol: https://github.com/csutcliff/keychron-battery-dkms
 Hitscan battery captures: https://github.com/sopparus/hitscan-battery
+
+Wireless controller and mouse protocol references (2026-10-29)
+Independent implementation of published packet facts; no third-party code or
+drivers from these projects are bundled. See 适配说明-无线手柄与鼠标.md.
+BETOP Kunpeng 20: https://github.com/oitsukiii/betop-battery
+Flydigi Apex 5: https://github.com/mkaliaha/openflydigi
+Flydigi Vader 5 Pro: https://github.com/AlexandreFournier/xpad-flydigi
+Flydigi receiver identity: https://github.com/Chillsmeit/vader5pro-remap-driver
+GameSir Cyclone 2: https://github.com/vdemonchy/cyclone2-linux
+SteelSeries wireless mice: https://github.com/flozz/rivalcfg
+
+Additional wireless battery protocol references (2026-10-29)
+Independent packet implementation; no upstream runtime or driver code bundled.
+BETOP plain protocol and SKU table: https://github.com/whisperers26/BatteryInfo
+8BitDo report format and IDs: https://github.com/libsdl-org/SDL
+8BitDo and HyperX captured packets: https://github.com/HeyOkay/HaloBattery
+Sony INZONE and SteelSeries earbud protocol: https://github.com/Sapd/HeadsetControl
+See 适配说明-北通八位堂与耳机.md for supported interfaces and validation limits.

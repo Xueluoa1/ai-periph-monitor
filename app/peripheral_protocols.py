@@ -26,6 +26,7 @@ CATALOG = {
     (0x1A2C, 0x8FFF): Profile('ajazz_ak820', ak820.MODEL),
     (0x320F, 0x221D): Profile('delux_m618xsd', m618.MODEL),
     (0x3537, 0x10B9): Profile('gamesir_g7', g7.MODEL),
+    (0x3537, 0x100B): Profile('gamesir_g7', g7.MODELS[0x100B]),
     (0x1915, 0x0723): Profile('darmoshark_m3pro', '达摩鲨 Nordic 接收器（待读取配对型号）'),
     (0x320F, 0x5088): Profile('weisheng_keyboard', wk.MODEL),
     (0x260D, 0x1114): Profile('dareu', '达尔优 DAREU A950 PRO Mg 鼠标'),

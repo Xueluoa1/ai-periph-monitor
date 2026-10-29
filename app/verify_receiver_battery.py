@@ -20,21 +20,101 @@ def iface(vid, pid, protocol=None):
         'hitscan': (0xFF02, 2, 17, 17, 0),
         'gw_old': (0xFFFF, 1, 0, 0, 65),
         'gw_new': (0xFFFF, 1, 0, 0, 65),
+        'betop_kp20': (0xFF00, 3, 64, 64, 0),
+        'betop_kp_plain': (0x00FF, 3, 64, 64, 0),
+        'eightbitdo_bt': (1, 5, 64, 0, 64),
+        'eightbitdo_pro3': (1, 5, 64, 0, 64),
+        'hyperx_alpha2': (0xFF13, 0xFF00, 64, 64, 0),
+        'sony_inzone': (0xFF04, 2 if pid == 0x0EBF else 1, 64, 64, 0),
+        'flydigi_apex5': (0xFFA0, 1, 64, 32, 0),
+        'flydigi_vader5': (0xFFA0, 1, 33, 33, 0),
     }.get(protocol, (0xFFC0, 1, 64, 64, 0))
     return SimpleNamespace(vid=vid, pid=pid, usage_page=page, usage=usage,
                            input_len=inp, output_len=out, feature_len=feature,
-                           path='test&mi_04#vendor', product='', manufacturer='',
+                           path=('hid#vid&00022dc8_pid&6009#bluetooth' if protocol.startswith('eightbitdo')
+                                 else 'test&mi_04#vendor'), product='BTP-KP20EB', manufacturer='',
                            reserved=False, vid_pid=f'{vid:04X}:{pid:04X}')
 
 
 class ReceiverTests(unittest.TestCase):
+    def test_betop_public_capture_and_false_zero(self):
+        for raw,level,status in (('0215640051010100',100,'charging'),
+                                 ('02155d0050010100',93,'discharging'),
+                                 ('0215000050010100',0,'discharging')):
+            r = rx.decode('betop_kp20', bytes.fromhex(raw))
+            self.assertEqual((r.level,r.status),(level,status))
+        for raw in ('0215','0215000000000000','0225640051010100','0215ff0050010100'):
+            self.assertIsNone(rx.decode('betop_kp20',bytes.fromhex(raw)))
+        d=iface(0x20BC,0x5191);d.usage_page=0x00FF
+        self.assertTrue(rx.matches(d))
+        d.product='Different controller'
+        self.assertFalse(rx.matches(d))
+
+    def test_flydigi_capture_is_steps_not_percent(self):
+        # Published Apex 5 command-1 capture; padded transport tail.
+        raw=bytes.fromhex('045aa5010100800200000000054501007045').ljust(32,b'\0')
+        r=rx.decode('flydigi_apex5',raw)
+        self.assertEqual((r.level,r.label,r.status),(None,'5/5 档','discharging'))
+        for value in (0,0x13,0x15):
+            frame=bytearray(raw);frame[12]=value
+            r=rx.decode('flydigi_apex5',frame)
+            self.assertEqual(r.label,f'{value & 15}/5 档')
+            self.assertEqual(r.status,'charging' if value>>4 else 'discharging')
+        for index,value in ((0,0),(1,0),(3,2),(5,1),(6,149),(7,1),(12,6),(12,0x25)):
+            frame=bytearray(raw);frame[index]=value
+            self.assertIsNone(rx.decode('flydigi_apex5',frame),(index,value))
+        self.assertIsNone(rx.decode('flydigi_apex5',raw[:13]))
+        self.assertIsNone(rx.decode('flydigi_vader5',raw))
+
+    def test_vader_unnumbered_frames_and_length_layout(self):
+        # Synthetic, derived from published Vader 5 field layout.
+        raw=bytes.fromhex('005aa501010082020000000003').ljust(33,b'\0')
+        self.assertEqual(rx.decode('flydigi_vader5',raw).label,'3/5 档')
+        unfragmented=raw[:4]+b'\x1c'+raw[6:]+b'\0'
+        self.assertEqual(rx.decode('flydigi_vader5',unfragmented).label,'3/5 档')
+        frame=bytearray(raw);frame[4:6]=b'\x02\x01'
+        self.assertIsNone(rx.decode('flydigi_vader5',frame))
+
+    def test_steel_wireless_scale_and_offline(self):
+        for code in range(1,22):
+            for flag in (0,128):
+                raw=bytes((0xD2,code|flag))
+                r=rx.decode('steel_mouse',raw)
+                self.assertEqual((r.level,r.label),((code-1)*5,f'约 {(code-1)*5}%'))
+                self.assertEqual(rx.decode('steel_mouse',b'\0'+raw),r)
+                self.assertEqual(r.status,'charging' if flag else 'discharging')
+        for raw in (b'',b'\xd2',b'\xd2\0',b'\xd2\x80',b'\xd2\x16',b'\xaa\x15'):
+            self.assertIsNone(rx.decode('steel_mouse',raw))
+
+    def test_new_queries_only_send_status(self):
+        cases=((0x20BC,0x5191,'0215','02155d0050010100'),
+               (0x37D7,0x2501,'035aa5010203','045aa5010100800200000000054501007045'),
+               (0x37D7,0x2401,'005aa5010203','005aa501010082020000000003'),
+               (0x1038,0x1838,'00d2','d20b'))
+        for vid,pid,request,response in cases:
+            d=iface(vid,pid);dev=Mock()
+            packet=bytes.fromhex(request).ljust(d.output_len,b'\0')
+            dev.read_input.side_effect=[packet,bytes.fromhex(response).ljust(d.input_len,b'\0')]
+            self.assertIsNotNone(rx.query(dev,d))
+            dev.write_output.assert_called_once_with(packet,use_hidd=False)
+            dev.set_feature_report.assert_not_called()
+            dev.drain.assert_called_once_with()
+
+    def test_new_labels_survive_shared_snapshot(self):
+        for label in ('0/5 档','5/5 档','约 0%','约 100%'):
+            r=battery.DiscoveredReading('test','controller','',level_label=label)
+            self.assertEqual(shared.readings_from(shared.merge_snapshot(shared.empty_snapshot(),[r],10))[0].level_label,label)
+        for label in ('6/5 档','约 101%','约 99%'):
+            with self.assertRaises(ValueError):
+                shared.readings_from({'readings':[dict(key='test',title='',subtitle='',level_label=label)]})
+
     def test_catalog_uses_complete_interface_match(self):
         for vid, pid in rx.CATALOG:
             d = iface(vid, pid)
             with self.subTest(vid=vid, pid=pid):
                 self.assertTrue(rx.matches(d))
                 self.assertTrue(battery._is_candidate_interface(d, []))
-                d.usage_page = 1
+                d.usage_page = 0
                 self.assertFalse(rx.matches(d))
                 self.assertFalse(battery._is_candidate_interface(d, []))
                 dev = Mock()
@@ -45,6 +125,9 @@ class ReceiverTests(unittest.TestCase):
         for vid, pid in ((0x3770,0x0100), (0x3434,0xD048), (0x1E71,0x2129),
                          (0x33E4,0x5804), (0x33E4,0x3808), (0x33E4,0xFFFF),
                          (0x1038,0xFFFF), (0x03F0,0xFFFF)):
+            self.assertIsNone(rx.profile_for(SimpleNamespace(vid=vid,pid=pid)))
+        for vid,pid in ((0x1038,0x183A),(0x1038,0x1842),(0x1038,0x184A),
+                        (0x37D7,0x2601),(0x37D7,0x6101),(0x20BC,0xFFFF)):
             self.assertIsNone(rx.profile_for(SimpleNamespace(vid=vid,pid=pid)))
 
     def test_keychron_needs_management_interface(self):
