@@ -21,6 +21,8 @@ def iface(vid, pid, protocol=None):
         'gw_old': (0xFFFF, 1, 0, 0, 65),
         'gw_new': (0xFFFF, 1, 0, 0, 65),
         'betop_kp20': (0xFF00, 3, 64, 64, 0),
+        'rog_harpe2': (0xFF01, 1, 64, 64, 0),
+        'rog_pelta': (0xFF00, 1, 64, 64, 0),
         'betop_kp_plain': (0x00FF, 3, 64, 64, 0),
         'eightbitdo_bt': (1, 5, 64, 0, 64),
         'eightbitdo_pro3': (1, 5, 64, 0, 64),

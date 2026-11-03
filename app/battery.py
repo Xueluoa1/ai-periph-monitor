@@ -656,10 +656,11 @@ def _logitech_probe_index(dev: HidDevice, iface: HidInterface, rid: int,
 # --------------------------------------------------------------------------
 def monitor_input_reports(iface: HidInterface, seconds: float = 3.0,
                           on_report: Optional[Callable[[bytes], None]] = None,
-                          stop_flag: Optional[Callable[[], bool]] = None
+                          stop_flag: Optional[Callable[[], bool]] = None,
+                          battery_only: bool = False
                           ) -> tuple[Optional[BatteryResult], list[bytes]]:
     """在若干秒内监听 Input Report，找上报的电量字段。"""
-    if not iface.input_len:
+    if not iface.input_len or (battery_only and iface.reserved):
         return None, []
     try:
         dev = HidDevice(iface.path, write=False)
@@ -673,6 +674,8 @@ def monitor_input_reports(iface: HidInterface, seconds: float = 3.0,
             key = (cap.UsagePage, cap.u.NotRange.Usage)
             if any(b[0] == key[0] and b[1] == key[1] for b in hw.BATTERY_USAGES):
                 battery_caps.append(cap)
+        if battery_only and not battery_caps:
+            return None, []
         deadline = time.monotonic() + seconds
         while time.monotonic() < deadline:
             if stop_flag is not None and stop_flag():
@@ -705,6 +708,8 @@ def monitor_input_reports(iface: HidInterface, seconds: float = 3.0,
                         raw=report,
                     )
                     break
+            if battery_only and result is not None:
+                break
     except HidError as e:
         return BatteryResult(ok=False, source="输入报告监听", detail=str(e)), found
     finally:
@@ -1446,7 +1451,7 @@ def _read_battery_unlocked(iface: HidInterface, listen_seconds: float = 3.0,
     if listen_seconds > 0:
         if progress:
             progress(f"尝试：监听输入报告 {listen_seconds:.0f} 秒")
-        res, _ = monitor_input_reports(iface, seconds=listen_seconds)
+        res, _ = monitor_input_reports(iface, seconds=listen_seconds, battery_only=True)
         if res is not None:
             attempts.append(res)
     return attempts
@@ -1753,6 +1758,14 @@ def discover_and_read_all(include_bt: bool = False, presence: Optional[dict] = N
         # and standard HID devices which currently return no battery report).
         presence['hid_keys'] = {f'{d.vid:04X}:{d.pid:04X}:{d.usage_page:04X}' for d in all_ifaces}
         presence['hid_unknown'] = {f'{d.vid:04X}:{d.pid:04X}' for d in all_ifaces if not d.usage_page}
+        # Old builds could show the SPEEDNOVA keyboard slot or PELTA's other
+        # collections. Remove those stale cards once their non-battery identity
+        # is known, while retaining a temporarily unreadable real battery channel.
+        rog_pages = {0x1AD0: 0xFF01, 0x1B84: 0xFF00}
+        presence.setdefault('excluded_keys', set()).update(
+            f'{d.vid:04X}:{d.pid:04X}:{d.usage_page:04X}' for d in all_ifaces
+            if d.vid == 0x0B05 and d.pid in rog_pages
+            and d.usage_page not in (0, rog_pages[d.pid]))
     peripheral.prune_listeners(all_ifaces)
     candidates = [d for d in all_ifaces if _is_candidate_interface(d, specs)]
     # Hyzen's vendor driver excludes its dongle while the cable is connected.
@@ -1761,20 +1774,22 @@ def discover_and_read_all(include_bt: bool = False, presence: Optional[dict] = N
     custom_models = _load_custom_models()
 
     readings: list[DiscoveredReading] = []
-    # 按 (vid, pid, usage_page) 去重，避免同一通道重复读取
-    seen_channels: set[tuple[int, int, int]] = set()
+    # Different collections can share UsagePage; only identical paths are duplicates.
+    seen_paths: set[str] = set()
+    successful_channels: set[tuple[int, int, int]] = set()
     # 记录每个 (vid, pid) 下读取到的结果，方便对 ROG Omni Receiver 这类多槽位接收器过滤未配对空槽
     grouped: dict[tuple[int, int], list[ tuple[HidInterface, Optional[BatteryResult]] ]] = {}
 
     for iface in candidates:
-        ch_key = ((iface.vid, iface.pid, iface.path) if peripheral.profile_for(iface)
-                  else (iface.vid, iface.pid, iface.usage_page))
-        if ch_key in seen_channels:
+        ch_key = (iface.vid, iface.pid, iface.usage_page)
+        if iface.path in seen_paths or ch_key in successful_channels:
             continue
-        seen_channels.add(ch_key)
+        seen_paths.add(iface.path)
 
-        attempts = read_battery(iface, listen_seconds=0.0)
+        attempts = read_battery(iface, listen_seconds=3.0)
         res = best_result(attempts)
+        if res is not None and res.ok:
+            successful_channels.add(ch_key)
         grouped.setdefault((iface.vid, iface.pid), []).append((iface, res))
 
     for (vid, pid), items in grouped.items():
@@ -1845,16 +1860,37 @@ def discover_and_read_all(include_bt: bool = False, presence: Optional[dict] = N
                 r_obj.error = res.detail or "外设无响应（可能处于休眠或未开机）"
             readings.append(r_obj)
 
-    # 可选：补充具有标准 HID 电量字段的其它设备（如怒喵键盘有线/2.4G 标准电池页）
+    # Standard battery fields can live on Input-only collections, including a
+    # sibling of a failed vendor interface. Only declared battery fields are read.
+    successful_devices = {(d.vid, d.pid) for items in grouped.values()
+                          for d, result in items if result is not None and result.ok}
+    import xiaomi_mouse2 as xm
     for iface in all_ifaces:
-        if am_battery.supports_device(iface) or k1.claims(iface):
+        # Exact protocol routes stay terminal: never guess another OEM protocol.
+        if (am_battery.supports_device(iface) or k1.claims(iface)
+                or receivers.profile_for(iface) or peripheral.profile_for(iface)
+                or wireless.claims(iface) or jbl.claims(iface) or xm.claims(iface)
+                or is_unidentified_logged_receiver(iface)):
             continue
-        if (iface.vid, iface.pid) in grouped or not iface.feature_len:
+        if (iface.vid, iface.pid) in successful_devices or iface.reserved:
             continue
         res = strategy_standard_battery_usage(iface)
+        if not (res and res.ok) and iface.input_len and iface.num_input_value_caps:
+            from device_io import device_session
+            try:
+                with device_session():
+                    res, _ = monitor_input_reports(iface, seconds=3.0, battery_only=True)
+            except TimeoutError:
+                continue
         if res and res.ok:
-            grouped[(iface.vid, iface.pid)] = [(iface, res)]
+            successful_devices.add((iface.vid, iface.pid))
+            # Replace the previous failed card, retaining its stable display key
+            # so a user's hidden/name preferences still apply.
+            old_key = next((r.key for r in readings
+                            if r.key.startswith(f'{iface.vid:04X}:{iface.pid:04X}:')), '')
+            readings = [r for r in readings if not r.key.startswith(f'{iface.vid:04X}:{iface.pid:04X}:')]
             key = f"{iface.vid:04X}:{iface.pid:04X}:{iface.usage_page:04X}"
+            key = old_key or key
             title = resolve_full_model_name(iface, res, custom_models, key)
             readings.append(DiscoveredReading(
                 key=key,

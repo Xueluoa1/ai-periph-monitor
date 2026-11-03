@@ -122,3 +122,8 @@ BETOP plain protocol and SKU table: https://github.com/whisperers26/BatteryInfo
 8BitDo and HyperX captured packets: https://github.com/HeyOkay/HaloBattery
 Sony INZONE and SteelSeries earbud protocol: https://github.com/Sapd/HeadsetControl
 See 适配说明-北通八位堂与耳机.md for supported interfaces and validation limits.
+
+ROG Harpe II Ace / PELTA battery packet facts (2026-11-03)
+Sources: https://github.com/seerge/g-helper/tree/main/app/Peripherals
+Independent protocol implementation; no third-party driver/source bundled.
+Actual interface descriptors checked against user diagnostic run fa0303ce.

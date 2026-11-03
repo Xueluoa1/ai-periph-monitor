@@ -23,6 +23,32 @@ def iface(**kwargs):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_fa0303ce_rog_routes_query_correct_report_ids_and_offsets(self):
+        # Interface identities came from fa0303ce; replies are synthetic.
+        cases = [(0x1AD0,0xFF01,['03120700004b0214630f00'],75,['031207']),
+                 (0x1B84,0xFF00,['cc12070000054d1401','cc1208000001'],77,['cc1207','cc1208'])]
+        for pid,page,replies,level,requests in cases:
+            d=iface(vid=0x0B05,pid=pid,usage_page=page,usage=1,feature_len=0)
+            self.assertTrue(m.should_probe_interface(vars(d),False,set()))
+            dev=Mock();dev.read_input.side_effect=[bytes.fromhex(s).ljust(64,b'\0') for s in replies]
+            result=probes.run_interface_probes(dev,d,Mock())
+            self.assertEqual(result['capabilities']['battery']['level_percent'],level)
+            self.assertEqual([c.args[0] for c in dev.write_output.call_args_list],
+                             [bytes.fromhex(s).ljust(64,b'\0') for s in requests])
+            dev.get_feature_report.assert_not_called()
+            dev.set_feature_report.assert_not_called()
+
+    def test_fa0303ce_rog_unused_collections_never_receive_mouse_queries(self):
+        for pid,page,usage,inp,out in ((0x1AD0,0xFF00,1,64,64),(0x1AD0,0xFF02,1,64,64),
+                                      (0x1B84,0xFF07,0x212,63,61),(0x1B84,0xFF0B,0x104,61,61)):
+            d=iface(vid=0x0B05,pid=pid,usage_page=page,usage=usage,input_len=inp,output_len=out)
+            self.assertFalse(m.should_probe_interface(vars(d),True,set()))
+            dev=Mock()
+            result=probes.run_interface_probes(dev,d,Mock())
+            self.assertFalse(result['capabilities']['identity']['interface_verified'])
+            dev.write_output.assert_not_called()
+            dev.get_feature_report.assert_not_called()
+
     def test_new_betop_and_headset_routes_use_shared_queries(self):
         cases = [
             (dict(vid=0x20BC,pid=0x518D,usage_page=0x00FF,usage=3), '02155b0050010050',91),

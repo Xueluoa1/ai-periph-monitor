@@ -658,8 +658,8 @@ def build_ui():
     def apply(readings: list[Reading]):
         sync_cards(readings)
         readings = [r for r in state['last_readings'] if r.key]
-        ok = sum(1 for r in readings if r.ok)
-        retained = sum(1 for r in readings if r.ok and r.stale)
+        ok = sum(1 for r in readings if r.ok or r.level_label)
+        retained = sum(1 for r in readings if (r.ok or r.level_label) and r.stale)
         total = len(readings)
         foot.configure(text=f"更新于 {time.strftime('%H:%M:%S')}   "
                             f"显示电量 {ok}/{total} 个设备"

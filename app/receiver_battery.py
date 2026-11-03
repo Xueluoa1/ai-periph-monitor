@@ -26,6 +26,10 @@ def _add(vid, protocol, models):
         CATALOG[vid, pid] = Profile(name, protocol)
 
 
+_add(0x0B05, 'rog_harpe2', {0x1AD0: 'ROG 龙鳞 ACE 2 / SPEEDNOVA 8K 鼠标'})
+_add(0x0B05, 'rog_pelta', {0x1B84: 'ROG PELTA（破风）无线耳机'})
+
+
 _add(0x1038, 'nova7_percent', {
     0x22A1: '赛睿 Arctis Nova 7 耳机',
     0x227E: '赛睿 Arctis Nova 7 Gen 2 耳机',
@@ -147,6 +151,9 @@ def matches(iface):
         return False
     page, usage = iface.usage_page, iface.usage
     inp, out, feature = iface.input_len, iface.output_len, iface.feature_len
+    if p.protocol in ('rog_harpe2', 'rog_pelta'):
+        page_expected = 0xFF01 if p.protocol == 'rog_harpe2' else 0xFF00
+        return (page, usage, inp, out) == (page_expected, 1, 64, 64)
     if p.protocol.startswith('eightbitdo'):
         path = iface.path.lower()
         bluetooth = 'vid&' in path or '{00001124-0000-1000-8000-00805f9b34fb}' in path or 'bthle' in path
@@ -199,6 +206,17 @@ def _steps(value, status):
 def decode(protocol, raw):
     """Reject unrelated, truncated, offline, invalid and request-echo reports."""
     r = bytes(raw or b'')
+    if protocol in ('rog_harpe2', 'rog_pelta'):
+        rid = 3 if protocol == 'rog_harpe2' else 0xCC
+        if (len(r) != 64 or r[:3] != bytes((rid, 0x12, 7))
+                or r[5:7] == b'\xff\xaa' or not any(r[5:11])):
+            return None
+        if protocol == 'rog_pelta':
+            # Byte 5 is the sleep timer; unlike mice, percent is byte 6.
+            return _percentage(r[6])
+        result = _percentage(r[5], 'charging' if r[10] else 'discharging')
+        mv = int.from_bytes(r[8:10], 'little')
+        return replace(result, voltage_mv=mv if 2500 <= mv <= 5000 else None) if result else None
     if protocol in ('betop_kp20', 'betop_kp_plain'):
         # Empty status echoes are not a live 0% battery. A real zero-level
         # status still contains the controller state bytes (public capture).
@@ -317,7 +335,7 @@ def decode(protocol, raw):
     return None
 
 
-def _input_query(dev, iface, packet, parse, *, feature=False):
+def _input_query(dev, iface, packet, parse, *, feature=False, timeout=1.2):
     dev.drain()
     if feature:
         dev.set_feature_report(packet)
@@ -325,7 +343,7 @@ def _input_query(dev, iface, packet, parse, *, feature=False):
         # Diagnostic wrappers return False; the native transport raises instead.
         if dev.write_output(packet, use_hidd=False) is False:
             raise OSError('接收器拒绝电量查询')
-    deadline = time.monotonic() + 1.2
+    deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         raw = dev.read_input(timeout_ms=100, length=iface.input_len)
         if raw and bytes(raw) != packet:
@@ -352,6 +370,25 @@ def query(dev, iface):
         raise ValueError('不是已核实的无线接收器电量接口')
     protocol = profile_for(iface).protocol
     parse = lambda raw: decode(protocol, raw)
+    if protocol in ('rog_harpe2', 'rog_pelta'):
+        rid = 3 if protocol == 'rog_harpe2' else 0xCC
+        packet = bytes((rid, 0x12, 7)).ljust(64, b'\0')
+        result, raw = _input_query(dev, iface, packet, parse, timeout=2.0)
+        if result is None:
+            return None
+        if protocol == 'rog_pelta':
+            def charge(data):
+                r = bytes(data or b'')
+                if len(r) == 64 and r[:3] == b'\xcc\x12\x08' and r[5:7] != b'\xff\xaa':
+                    return {0: 'discharging', 1: 'charging'}.get(r[5])
+                return None
+            try:
+                status, _ = _input_query(dev, iface, b'\xcc\x12\x08'+bytes(61), charge, timeout=2.0)
+                if status:
+                    result = replace(result, status=status)
+            except OSError:
+                pass  # A failed independent status query cannot erase battery.
+        return replace(result, raw=raw)
     if protocol.startswith('eightbitdo'):
         # Never GET_FEATURE 06: that READ switches input mode on older pads.
         deadline = time.monotonic() + 0.6

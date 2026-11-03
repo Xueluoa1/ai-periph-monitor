@@ -30,6 +30,7 @@ def main():
         z.write(root / 'docs' / '适配说明-无线电量扩展.md', '适配说明-无线电量扩展.md')
         z.write(root / 'docs' / '适配说明-无线手柄与鼠标.md', '适配说明-无线手柄与鼠标.md')
         z.write(root / 'docs' / '适配说明-北通八位堂与耳机.md', '适配说明-北通八位堂与耳机.md')
+        z.write(root / 'docs' / '适配说明-龙鳞ACE2与破风耳机.md', '适配说明-龙鳞ACE2与破风耳机.md')
     print(target)
 
 

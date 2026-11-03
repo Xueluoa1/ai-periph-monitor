@@ -42,7 +42,7 @@ import hid_evidence
 import receiver_battery
 
 VERSION = "1.5.0"
-BUILD_ID = '20261029-gamepads-headsets'
+BUILD_ID = '20261103-rog-harpe2-pelta'
 WORKER_TIMEOUT_S = 18.0
 INVENTORY_TIMEOUT_S = 20.0
 TOTAL_TIMEOUT_S = 180.0

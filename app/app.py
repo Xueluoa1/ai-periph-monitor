@@ -499,7 +499,7 @@ def build_ui():
                     bt_root, "end", tags=("bt",),
                     text="  " + bd.name,
                     values=("", "蓝牙 HFP", "",
-                            f"{bd.battery}%" if bd.battery else ""),
+                            f"{bd.battery}%" if bd.battery is not None else ""),
                 )
                 state["bt_by_iid"][iid] = bd
 
@@ -591,7 +591,7 @@ def build_ui():
             state["reading"] = False
             btn_read.configure(state="normal")
             lab_dev.configure(text=f"{d.name}   （蓝牙 HFP）")
-            if d.battery:
+            if d.battery is not None:
                 lab_level.configure(text=f"{d.battery}%")
                 lab_status.configure(text=f"来源：蓝牙 HFP 电量上报   {d.reason}")
                 progress["value"] = d.battery
@@ -659,8 +659,9 @@ def build_ui():
                 for a in attempts:
                     mark = "命中 ✔" if a.ok else "未命中"
                     log.append(f"    [{mark}] {a.source}：{a.detail}")
-                if attempts and attempts[0].ok:
-                    best = attempts[0]
+                candidate = bt.best_result(attempts)
+                if candidate is not None and candidate.ok:
+                    best = candidate
                     break
             return best, log
 
@@ -679,7 +680,7 @@ def build_ui():
                         vals[3] = f"{best.level}%"
                         tree.item(sel[0], values=vals)
             elif best and best.ok:
-                lab_level.configure(text="电压模式")
+                lab_level.configure(text=best.extra.get('level_label') or "电压模式")
                 lab_status.configure(text=f"{best.detail}   来源：{best.source}")
             else:
                 lab_level.configure(text="未知")
