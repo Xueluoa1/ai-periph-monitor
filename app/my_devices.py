@@ -284,8 +284,15 @@ def build_ui():
     test_nav.configure(command=lambda:show_page('test'))
     settings_head = ttk.Frame(settings_window, padding=(24, 22, 24, 16))
     settings_head.pack(fill="x")
-    ttk.Label(settings_head, text="设置", style="H1.TLabel").pack(anchor="w")
-    ttk.Label(settings_head, text="更改后自动生效", style="Muted.TLabel").pack(anchor="w", pady=(5, 0))
+    settings_credit = ttk.Label(
+        settings_head,
+        text="作者：雪落a · B站 ID：雪落a77\n个人网址：xueluo.online\n更多用 AI 开发的程序，欢迎访问个人网站",
+        style="Muted.TLabel", justify="right", anchor="e")
+    settings_credit.pack(side="right", anchor="center", padx=(16, 0))
+    settings_title = ttk.Frame(settings_head)
+    settings_title.pack(side="left", anchor="n")
+    ttk.Label(settings_title, text="设置", style="H1.TLabel").pack(anchor="w")
+    ttk.Label(settings_title, text="更改后自动生效", style="Muted.TLabel").pack(anchor="w", pady=(5, 0))
     settings_bottom = ttk.Frame(settings_window, padding=(24, 12))
     settings_bottom.pack(side="bottom", fill="x")
     ttk.Button(settings_bottom, text="返回设备", style="Accent.TButton", command=close_settings).pack(side="right")
