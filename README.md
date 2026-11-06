@@ -5,7 +5,7 @@ Windows 无线外设电量监测与配置工具，提供主界面、任务栏数
 当前主程序 **v1.0.2**，诊断工具 **v1.5.0**，构建日期 **2026-11-04**，构建标识 `20261104-author-credit`。早期 v26–v34 是历史开发编号，不是比 v1.0.2 更新的正式版本。
 
 
-**作者：雪落a · B站 ID：雪落a77**
+**作者：雪落a · B站 ID：雪落a77 · 个人站：https://xueluo.online**
 
 [下载最新版本](https://github.com/Xueluoa1/ai-periph-monitor/releases/latest) · [软件操作手册](docs/USER_GUIDE.md) · [品牌型号适配](docs/SUPPORT.md) · [完整型号细表](docs/DEVICE_MATRIX.md) · [作者声明与致谢](AUTHOR_STATEMENT.md)
 
