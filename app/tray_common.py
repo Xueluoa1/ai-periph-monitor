@@ -62,6 +62,8 @@ DEFAULT_CONFIG = {
     "autostart": True,         # 开机自启
     "taskbar_show": True,      # 显示任务栏设备电量图标；关闭时移除这些图标
     "taskbar_devices": None,   # None 自动显示全部；[] 不显示；列表为选定设备 key
+    "taskbar_merge": False,    # 将已选设备合并为一个图标
+    "taskbar_primary": "",     # 合并图标固定显示的设备 key
     "widget_devices": None,    # 与任务栏独立的设备选择
     "device_names": {},        # 已选择设备的名称，断连后仍可调整选择
     "hidden_devices": [],      # 全局隐藏：设备页、任务栏、挂件和电量提醒

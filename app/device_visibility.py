@@ -38,6 +38,8 @@ def device_options(readings, cfg):
     names.update(cfg.get('custom_models') or {})
     online = {r.key: r for r in readings if r.key}
     saved = set(cfg.get('hidden_devices') or ())
+    if cfg.get('taskbar_primary'):
+        saved.add(cfg['taskbar_primary'])
     for surface in ('taskbar', 'widget'):
         saved.update(selected_keys(cfg, surface) or ())
     keys = list(online) + sorted(saved - online.keys())

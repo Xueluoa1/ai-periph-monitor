@@ -593,8 +593,10 @@ def build_ui():
 
     selectors = []
     def choose_devices(surface):
-        def save_selection(value, names):
+        def save_selection(value, names, merge_options=None):
             cfg[surface + '_devices'] = value
+            if surface == 'taskbar' and merge_options is not None:
+                cfg.update(merge_options)
             cfg['device_names'] = {**(tc.load_config().get('device_names') or {}), **names}
             save_ui_config()
             tc.post_to_tray(tc.MSG_RELOAD)

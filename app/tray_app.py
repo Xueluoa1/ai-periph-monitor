@@ -64,6 +64,9 @@ MSG_TRAY_CALLBACK = WM_APP + 1
 MSG_REFRESH_DONE = WM_APP + 2
 
 NIM_ADD, NIM_MODIFY, NIM_DELETE = 0, 1, 2
+NIM_SETVERSION = 4
+NIN_SELECT, NIN_KEYSELECT, NIN_POPUPOPEN = 0x0400, 0x0401, 0x0406
+WM_CONTEXTMENU = 0x007B
 NIF_MESSAGE, NIF_ICON, NIF_TIP, NIF_INFO = 0x01, 0x02, 0x04, 0x10
 NIIF_INFO, NIIF_WARNING, NIIF_ERROR = 0x01, 0x02, 0x03
 
@@ -118,6 +121,15 @@ class MSG(ctypes.Structure):
                 ("wParam", ctypes.c_size_t), ("lParam", ctypes.c_ssize_t),
                 ("time", wintypes.DWORD), ("pt_x", wintypes.LONG),
                 ("pt_y", wintypes.LONG)]
+
+
+class NOTIFYICONIDENTIFIER(ctypes.Structure):
+    _fields_ = [('cbSize', wintypes.DWORD), ('hWnd', wintypes.HWND),
+                ('uID', wintypes.UINT), ('guidItem', hw.GUID)]
+
+
+SHELL32.Shell_NotifyIconGetRect.argtypes = [ctypes.POINTER(NOTIFYICONIDENTIFIER), ctypes.POINTER(wintypes.RECT)]
+SHELL32.Shell_NotifyIconGetRect.restype = ctypes.c_long
 
 
 USER32.RegisterClassExW.restype = wintypes.WORD
@@ -207,6 +219,7 @@ class TrayApp:
         self.readings: list[bt.DiscoveredReading] = shared.readings_from(snapshot)
         self.shared_revision = snapshot['revision']
         self.icon_retry = False
+        self.hover = None
         self.active_uids: set[int] = set()
         # 记录每个设备的低电量预警阶段：0=未预警，1=已触发普通低电量预警，2=已触发 <=10% 紧急预警
         self.notified_stage: dict[str, int] = {}
@@ -249,6 +262,12 @@ class TrayApp:
         if not self.cfg.get('taskbar_show', True):
             return []
         readings = visible_readings(self.readings, self.cfg, 'taskbar')
+        if self.cfg.get('taskbar_merge', False):
+            from tray_merge import taskbar_rows, primary_row
+            row = primary_row(taskbar_rows(self.readings, self.cfg), self.cfg)
+            if row is not None:
+                return [(1, row.title, row.level, row.info, row.headset, transport_for_key(row.key))]
+            return []
         if not self.readings and selected_keys(self.cfg, 'taskbar') is None:
             return [(1, "无线外设", None, "正在扫描或未检测到接收器", False, 'unknown')]
         if not hasattr(self, '_device_uids'):
@@ -285,9 +304,39 @@ class TrayApp:
             tip = f"{title}：{info or '未知'}"
         connection = tray_pixels.TRANSPORT_LABELS.get(transport, '连接方式待识别')
         nid.szTip = (f'外设电量 · {connection} · ' + tip)[:127]
-        return bool(SHELL32.Shell_NotifyIconW(action, ctypes.byref(nid)))
+        ok = bool(SHELL32.Shell_NotifyIconW(action, ctypes.byref(nid)))
+        if ok:
+            # Version 4 replaces the text tooltip with NIN_POPUPOPEN callbacks.
+            # Explicitly restore legacy behavior when returning to separate icons.
+            nid.uVersion = 4 if self.cfg.get('taskbar_merge', False) else 0
+            SHELL32.Shell_NotifyIconW(NIM_SETVERSION, ctypes.byref(nid))
+        return ok
+
+    def hide_hover(self):
+        if getattr(self, 'hover', None) is not None:
+            self.hover.hide()
+
+    def show_hover(self):
+        if not self.cfg.get('taskbar_merge', False) or 1 not in self.active_uids:
+            return
+        from tray_merge import taskbar_rows
+        from tray_hover import HoverController
+        identifier = NOTIFYICONIDENTIFIER()
+        identifier.cbSize = ctypes.sizeof(identifier)
+        identifier.hWnd, identifier.uID = self.hwnd, 1
+        rect = wintypes.RECT()
+        if SHELL32.Shell_NotifyIconGetRect(ctypes.byref(identifier), ctypes.byref(rect)) == 0:
+            anchor = rect.left, rect.top, rect.right, rect.bottom
+        else:
+            point = wintypes.POINT()
+            USER32.GetCursorPos(ctypes.byref(point))
+            anchor = point.x - 12, point.y - 12, point.x + 12, point.y + 12
+        if self.hover is None:
+            self.hover = HoverController()
+        self.hover.show(taskbar_rows(self.readings, self.cfg), self.cfg.get('theme', 'light'), anchor)
 
     def add_icons(self) -> None:
+        self.hide_hover()
         self.active_uids.clear()
         self.icon_retry = False
         for uID, title, level, info, plate, transport in self._current_slots():
@@ -325,8 +374,15 @@ class TrayApp:
                     self.icon_retry = True
         if added_any and self.cfg.get("taskbar_show", True):
             tc.promote_tray_icons_to_taskbar(True)
+        if getattr(self, 'hover', None) is not None:
+            if self.cfg.get('taskbar_merge', False) and slots:
+                from tray_merge import taskbar_rows
+                self.hover.update(taskbar_rows(self.readings, self.cfg), self.cfg.get('theme', 'light'))
+            else:
+                self.hide_hover()
 
     def remove_icons(self) -> None:
+        self.hide_hover()
         for uID in list(self.active_uids):
             nid = self._nid(uID)
             nid.uFlags = 0
@@ -401,6 +457,8 @@ class TrayApp:
         changed_interval = new["interval"] != self.cfg["interval"]
         changed_taskbar = new.get("taskbar_show") != self.cfg.get("taskbar_show")
         changed_devices = new.get('taskbar_devices') != self.cfg.get('taskbar_devices')
+        changed_merge = any(new.get(key) != self.cfg.get(key)
+                            for key in ('taskbar_merge', 'taskbar_primary', 'theme'))
         changed_hidden = new.get('hidden_devices') != self.cfg.get('hidden_devices')
         changed_notify = (
             new.get("notify_enabled") != self.cfg.get("notify_enabled")
@@ -411,7 +469,8 @@ class TrayApp:
         if changed_interval:
             self.log(f"刷新间隔 -> {new['interval']} 秒")
             self.apply_timer()
-        if changed_taskbar or changed_devices or changed_hidden or changed_models:
+        if changed_taskbar or changed_devices or changed_hidden or changed_models or changed_merge:
+            self.hide_hover()
             self.update_icons()
         if changed_taskbar and new.get('taskbar_show', True):
             tc.promote_tray_icons_to_taskbar(True)
@@ -465,6 +524,7 @@ class TrayApp:
 
     # ---- 打开工具界面 / 右键菜单 / 退出 ---------------------------------
     def open_ui(self, home=False) -> None:
+        self.hide_hover()
         hwnd = tc.ui_hwnd()
         if hwnd:
             if home:
@@ -486,6 +546,7 @@ class TrayApp:
         """Native checked switches; reload before writing to preserve other edits."""
         if not self.hwnd:
             return
+        self.hide_hover()
         menu_cfg = tc.load_config()
         hmenu = USER32.CreatePopupMenu()
         if not hmenu:
@@ -563,15 +624,20 @@ class TrayApp:
     # ---- 窗口过程 -------------------------------------------------------
     def wnd_proc(self, hwnd, msg, wparam, lparam):
         if msg in (0x001A, 0x031A, 0x007E):  # Settings/theme/display changes.
+            self.hide_hover()
             self.update_icons()
             return 0
         if msg == MSG_TRAY_CALLBACK:
             event = int(lparam) & 0xFFFF
-            if event == WM_RBUTTONUP:
+            if event in (WM_RBUTTONUP, WM_CONTEXTMENU):
                 self.show_context_menu()
+            elif event == NIN_POPUPOPEN:
+                self.show_hover()
             elif event == WM_LBUTTONDBLCLK:
                 self.open_ui()                     # 双击：打开工具界面
-            elif event == WM_LBUTTONUP:
+            elif event == NIN_KEYSELECT:
+                self.show_hover()
+            elif event == NIN_SELECT or (event == WM_LBUTTONUP and not self.cfg.get('taskbar_merge', False)):
                 self.refresh_now()                 # 单击：立即刷新一次电量
             return 0
         if msg == MSG_REFRESH_DONE:
@@ -604,6 +670,8 @@ class TrayApp:
             self.add_icons()
             return 0
         if msg == WM_DESTROY:
+            if getattr(self, 'hover', None) is not None:
+                self.hover.close()
             # 重要：销毁窗口后必须让消息循环退出，否则进程会残留成"僵尸"
             USER32.PostQuitMessage(0)
             return 0
