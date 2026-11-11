@@ -64,6 +64,7 @@ DEFAULT_CONFIG = {
     "taskbar_devices": None,   # None 自动显示全部；[] 不显示；列表为选定设备 key
     "taskbar_merge": False,    # 将已选设备合并为一个图标
     "taskbar_primary": "",     # 合并图标固定显示的设备 key
+    "taskbar_icon_style": "classic",  # 任务栏图标样式，保留原有外观为默认
     "widget_devices": None,    # 与任务栏独立的设备选择
     "device_names": {},        # 已选择设备的名称，断连后仍可调整选择
     "hidden_devices": [],      # 全局隐藏：设备页、任务栏、挂件和电量提醒

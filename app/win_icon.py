@@ -12,6 +12,7 @@ import ctypes
 import os
 import struct
 import tempfile
+from collections import OrderedDict
 from ctypes import wintypes
 from typing import Optional
 
@@ -152,7 +153,7 @@ user32.DestroyIcon.restype = wintypes.BOOL
 user32.DestroyIcon.argtypes = [ctypes.c_void_p]
 
 SIZES = (16, 20, 24, 32, 40, 48)
-_icon_cache: dict[tuple, int] = {}
+_icon_cache: dict[tuple, int] = OrderedDict()
 _tmp_dir: Optional[str] = None
 
 
@@ -165,17 +166,23 @@ def _ensure_tmp() -> str:
 
 
 def make_hicon(text: str, color: tuple[int, int, int], plate: bool = False,
-               kind: str = "mouse", state: str = "online", transport: str = "unknown") -> int:
+               kind: str = "mouse", state: str = "online", transport: str = "unknown",
+               style: str = 'classic') -> int:
     """Render a large number colored by connection, with red low-battery priority."""
     import tray_pixels
+    from tray_styles import normalize_style
+    style = normalize_style(style)
+    state = 'charging' if state == 'charging' else 'online'
+    text = str(max(0, min(100, int(text)))) if text.isdigit() else '--'
     size = max(16, min(64, user32.GetSystemMetrics(49)))
     light = system_uses_light_taskbar()
-    key = (text, size, transport, light)
+    key = (text, size, transport, light, style, state)
     if key in _icon_cache:
+        _icon_cache.move_to_end(key)
         return _icon_cache[key]
-    rgba = tray_pixels.render(text, size, transport=transport, light=light)
+    rgba = tray_pixels.render(text, size, transport=transport, light=light, style=style, state=state)
     ico = build_ico([(size, rgba)])
-    path = os.path.join(_ensure_tmp(), f"device_v24_{text}_{size}_{transport}_{int(light)}.ico")
+    path = os.path.join(_ensure_tmp(), f"device_{os.getpid()}_{text}_{size}_{transport}_{int(light)}_{style}_{state}.ico")
     try:
         with open(path, "wb") as f:
             f.write(ico)
@@ -183,8 +190,17 @@ def make_hicon(text: str, color: tuple[int, int, int], plate: bool = False,
         return 0
     h = user32.LoadImageW(None, path, IMAGE_ICON, size, size, LR_LOADFROMFILE)
     hicon = int(h) if h else 0
+    try:
+        os.remove(path)
+    except OSError:
+        pass
     if hicon:
         _icon_cache[key] = hicon
+        # Shell keeps its own copy after NIM_ADD/NIM_MODIFY. Bound native handles
+        # while switching styles or walking through a full battery discharge.
+        if len(_icon_cache) > 256:
+            _, old = _icon_cache.popitem(last=False)
+            user32.DestroyIcon(ctypes.c_void_p(old))
     return hicon
 
 

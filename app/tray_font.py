@@ -44,7 +44,7 @@ def load_bundled_font():
 
 
 @lru_cache(maxsize=768)
-def digit_mask(text, size):
+def digit_mask(text, size, box=None):
     """Fit real glyph ink within a square frame with a transparent inner margin."""
     zoom = 4
     face = load_bundled_font()
@@ -67,6 +67,12 @@ def digit_mask(text, size):
         gap = max(1, round(size/16))
         margin = (inset + stroke + gap) * zoom
         available = side - margin * 2
+        if box is None:
+            bounds = (margin, margin, side-margin, side-margin)
+        else:
+            bounds = tuple(round(v*zoom) for v in box)
+        available_width = bounds[2]-bounds[0]
+        available_height = bounds[3]-bounds[1]
         # Measure actual ink, not font advance: 100 must fit the same square.
         for height in range(round(side * .9), zoom, -1):
             font = gdi.CreateFontW(-height, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 3, 0, face)
@@ -91,13 +97,13 @@ def digit_mask(text, size):
                 top = min(p[1] for p in points); bottom = max(p[1] for p in points)
                 # Reserve one extra pixel when measuring to avoid clipped ink.
                 if (left > 0 and right < side-1 and top > 0 and bottom < side-1
-                        and right-left+1 <= available and bottom-top+1 <= available):
+                        and right-left+1 <= available_width and bottom-top+1 <= available_height):
                     break
             finally:
                 gdi.SelectObject(dc, previous_font)
                 gdi.DeleteObject(font)
-        ox = (side-(right-left+1))//2-left
-        oy = (side-(bottom-top+1))//2-top
+        ox = bounds[0]+(available_width-(right-left+1))//2-left
+        oy = bounds[1]+(available_height-(bottom-top+1))//2-top
         mask = bytearray(size*size)
         for y in range(size):
             for x in range(size):

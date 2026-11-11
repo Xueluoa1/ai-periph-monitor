@@ -1,6 +1,6 @@
 # 品牌型号适配情况
 
-主程序 v1.0.2 / 诊断 v1.5.0，构建 `20261111-compact-centered-hover`（2026-11-11）。
+主程序 v1.0.2 / 诊断 v1.5.0，构建 `20261111-tray-styles`（2026-11-11）。
 
 [操作手册](USER_GUIDE.md) · [完整型号与 USB ID 细表](DEVICE_MATRIX.md) · [验证结果](VALIDATION.md)
 

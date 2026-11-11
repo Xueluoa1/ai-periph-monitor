@@ -6,15 +6,15 @@ import sys
 import tempfile
 
 
-def build():
+def build(output_dir=None):
     # Fail before building if the environment cannot initialize Tcl/Tk. Otherwise
     # PyInstaller silently excludes tkinter and produces an unusable application.
     import tkinter
     probe = tkinter.Tcl()
     probe.eval('info library')
     source = Path(__file__).resolve().parent
-    output = source.parent / 'release'
-    output.mkdir(exist_ok=True)
+    output = Path(output_dir).resolve() if output_dir else source.parent / 'release'
+    output.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix='battery_ui_build_'))
     for file in source.iterdir():
         if file.suffix in ('.py', '.ico', '.png'):
@@ -45,4 +45,7 @@ def build():
 
 
 if __name__ == '__main__':
-    build()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--output-dir', help='将构建写入指定目录，不覆盖正在运行的版本')
+    build(parser.parse_args().output_dir)

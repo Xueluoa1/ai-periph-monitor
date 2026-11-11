@@ -155,7 +155,8 @@ def build_ui():
     style = ui.configure(root)
 
     rail = tk.Frame(root, bg=ui.PANEL, width=round(76*factor),
-                    highlightbackground=ui.LINE, highlightthickness=1)
+                    highlightbackground=ui.LINE, highlightcolor=ui.LINE,
+                    highlightthickness=1, takefocus=False)
     rail.pack(side='left', fill='y')
     rail.pack_propagate(False)
     mark = tk.Canvas(rail, width=48, height=64, bg=ui.PANEL, highlightthickness=0)
@@ -547,6 +548,15 @@ def build_ui():
     for value, label in (('light', '浅色'), ('dark', '暗色')):
         ttk.Radiobutton(theme_controls, text=label, value=value, variable=v_theme,
                         style='Filter.TRadiobutton', command=on_theme).pack(side='left', padx=(4, 0))
+
+    from ui_tray_style import TrayStyleSettings
+    def on_tray_style(style):
+        cfg['taskbar_icon_style'] = style
+        save_ui_config()
+        tc.post_to_tray(tc.MSG_RELOAD)
+        notify('任务栏图标样式已保存' + ('，开启任务栏显示后生效' if not v_taskbar.get() else ''))
+    TrayStyleSettings(setbar, cfg, on_tray_style).pack(fill='x')
+    ttk.Separator(setbar).pack(fill='x')
 
     group("桌面挂件")
     setting_switch("显示桌面挂件", v_widget, on_widget_toggle)

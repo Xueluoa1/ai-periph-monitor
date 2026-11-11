@@ -76,9 +76,13 @@ def rim_progress(x, y, center):
     return .625+(dy+1)/8
 
 
-def render(text, size, kind='mouse', state='online', light=False, transport='unknown'):
+def render(text, size, kind='mouse', state='online', light=False, transport='unknown', style='classic'):
     """HuangYou digits and a transport-colored perimeter battery indicator."""
     from tray_font import digit_mask
+    from tray_styles import normalize_style, render_style
+    style = normalize_style(style)
+    if style != 'classic':
+        return render_style(text, size, style, light, transport, state)
     pixels = bytearray(size*size*4)
     value = max(0,min(100,int(text))) if text.isdigit() else None
     text = '--' if value is None else str(value)

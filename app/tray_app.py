@@ -293,7 +293,8 @@ class TrayApp:
         import tray_pixels
         kind = tray_pixels.kind_for_title(title, plate)
         state = "sleep" if "休眠" in info else "charging" if "充电" in info else "online"
-        nid.hIcon = win_icon.make_hicon(text, self._color(level), plate, kind=kind, state=state, transport=transport)
+        nid.hIcon = win_icon.make_hicon(text, self._color(level), plate, kind=kind, state=state,
+                                     transport=transport, style=self.cfg.get('taskbar_icon_style', 'classic'))
         if not nid.hIcon:
             return False  # Never replace a working icon with an empty HICON.
         if level is not None:
@@ -458,7 +459,7 @@ class TrayApp:
         changed_taskbar = new.get("taskbar_show") != self.cfg.get("taskbar_show")
         changed_devices = new.get('taskbar_devices') != self.cfg.get('taskbar_devices')
         changed_merge = any(new.get(key) != self.cfg.get(key)
-                            for key in ('taskbar_merge', 'taskbar_primary', 'theme'))
+                            for key in ('taskbar_merge', 'taskbar_primary', 'theme', 'taskbar_icon_style'))
         changed_hidden = new.get('hidden_devices') != self.cfg.get('hidden_devices')
         changed_notify = (
             new.get("notify_enabled") != self.cfg.get("notify_enabled")
