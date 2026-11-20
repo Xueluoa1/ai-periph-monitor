@@ -127,3 +127,5 @@ ROG Harpe II Ace / PELTA battery packet facts (2026-11-03)
 Sources: https://github.com/seerge/g-helper/tree/main/app/Peripherals
 Independent protocol implementation; no third-party driver/source bundled.
 Actual interface descriptors checked against user diagnostic run fa0303ce.
+
+2026-11-20 wireless protocol references: Darmoshark M3 configurator, Wireless-Device-Battery-Monitor, OpenMHub, mchose-v9-pro-battery-tray and OpenMouse mouse-protocol. Protocol facts independently implemented; detailed source URLs and hardware verification limits: docs/适配说明-20261120.md.

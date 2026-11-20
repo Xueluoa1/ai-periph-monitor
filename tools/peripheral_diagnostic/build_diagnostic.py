@@ -6,12 +6,12 @@ import sys
 import zipfile
 
 
-def main():
+def main(output_dir=None):
     source = Path(__file__).resolve().parent
     root = source.parents[1]
     stage = root / 'output' / 'peripheral-diagnostic-v1.5-build'
     stage.mkdir(parents=True, exist_ok=True)
-    release = root / 'release'
+    release = Path(output_dir).resolve() if output_dir else root / 'release'
     release.mkdir(parents=True, exist_ok=True)
     cmd = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--onefile', '--console',
            '--name', 'PeripheralDiagnostic', '--distpath', str(stage / 'dist'),
@@ -31,8 +31,12 @@ def main():
         z.write(root / 'docs' / '适配说明-无线手柄与鼠标.md', '适配说明-无线手柄与鼠标.md')
         z.write(root / 'docs' / '适配说明-北通八位堂与耳机.md', '适配说明-北通八位堂与耳机.md')
         z.write(root / 'docs' / '适配说明-龙鳞ACE2与破风耳机.md', '适配说明-龙鳞ACE2与破风耳机.md')
+        z.write(root / 'docs' / '适配说明-20261120.md', '适配说明-20261120.md')
     print(target)
 
 
 if __name__ == '__main__':
-    main()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--output-dir', help='将构建写入指定目录')
+    main(parser.parse_args().output_dir)

@@ -636,8 +636,6 @@ def _am30_query(dev: HidDevice, emit: EmitFn, label: str, cmd: int) -> Optional[
 def probe_angry_miao(dev: HidDevice, iface: HidInterface, emit: EmitFn) -> dict:
     summary: dict = {"brand": "Angry Miao (怒喵)"}
     feat_ids = set(report_ids_for(dev, 2))
-    out_ids = set(report_ids_for(dev, 1))
-
     # 分支 A: AM35 RACE (Feature 0x14 或 Output 0x06)
     if 0x14 in feat_ids or 0x06 in out_ids or (iface.vid, iface.pid) in ((0x3710, 0x5408), (0x3710, 0x3411)):
         prof_b = _am35_query(dev, iface, emit, "profile_0x30C9", 0x30C9)
@@ -1019,34 +1017,9 @@ def _mchose_v2_query(dev: HidDevice, emit: EmitFn, label: str, report_id: int, s
     return decoded if decoded[1] == subcmd else None
 
 
-def _mchose_v3_query(dev: HidDevice, emit: EmitFn, label: str, cmd_word: int, payload: bytes = b"") -> Optional[bytes]:
-    buf = bytearray(65)
-    buf[0] = 0x4D
-    buf[1] = (cmd_word >> 8) & 0xFF
-    buf[2] = cmd_word & 0xFF
-    buf[6] = len(payload)
-    buf[8 : 8 + len(payload)] = payload
-    buf[7] = (0xFF - (sum(buf[1:]) & 0xFF)) & 0xFF
-    dev.drain()
-    emit("tx", brand="mchose_v3", label=label, method="output_0x4D", hex=bytes(buf).hex())
-    if not dev.write_output(bytes(buf), use_hidd=False):
-        dev.write_output(bytes(buf), use_hidd=True)
-    deadline = time.monotonic() + 0.35
-    while time.monotonic() < deadline:
-        r = dev.read_input(timeout_ms=90)
-        if not r:
-            continue
-        emit("rx", brand="mchose_v3", label=label, method="input_0x4D", hex=r.hex())
-        if len(r) >= 12 and r[0] == 0x4D and r[1] == buf[1] and r[2] == buf[2]:
-            return r
-    return None
-
-
 def probe_mchose(dev: HidDevice, iface: HidInterface, emit: EmitFn) -> dict:
     summary: dict = {"brand": "MCHOSE (迈从)"}
     feat_ids = set(report_ids_for(dev, 2))
-    out_ids = set(report_ids_for(dev, 1))
-
     # 分支 A: M HUB V2 (Feature 0x11 & 0x12, UsagePage 0xFF01)
     if {0x11, 0x12}.issubset(feat_ids) or (iface.usage_page == 0xFF01 and (dev.caps.FeatureReportByteLength or 0) == 32):
         bat_r = _mchose_v2_query(dev, emit, "v2_battery_0x06", 0x11, 0x06)
@@ -1087,29 +1060,8 @@ def probe_mchose(dev: HidDevice, iface: HidInterface, emit: EmitFn) -> dict:
             }
             emit("decoded", brand="mchose_v2", label="config_0x67", value={"polling": summary["polling_rate"], "dpi": summary["dpi"], "sensor": summary["sensor_params"]})
 
-    # 分支 B: M HUB V3 (Report ID 0x4D, 65B)
-    if 0x4D in out_ids or (iface.usage_page == 0xFF01 and iface.output_len == 65):
-        r_info = _mchose_v3_query(dev, emit, "v3_info_0x0900", 0x0900)
-        if r_info and r_info[8] <= 100:
-            summary["battery"] = {"level_percent": r_info[8], "charging": bool(r_info[9] == 1), "dpi_stage_count": r_info[14]}
-            emit("decoded", brand="mchose_v3", label="battery", value=summary["battery"])
-        r_set = _mchose_v3_query(dev, emit, "v3_settings_0x0002", 0x0002, b"\x00")
-        if r_set:
-            rate_code = r_set[10]
-            summary["polling_rate"] = {"rate_code": rate_code, "polling_rate_hz": {1: 1000, 2: 500, 4: 250, 8: 125, 16: 2000, 32: 4000, 64: 8000}.get(rate_code, rate_code)}
-            emit("decoded", brand="mchose_v3", label="polling_rate", value=summary["polling_rate"])
-        r_dpi = _mchose_v3_query(dev, emit, "v3_dpi_0x0003", 0x0003, b"\x00")
-        if r_dpi:
-            stages = []
-            for i in range(6):
-                off = 9 + i * 7
-                if off + 7 <= len(r_dpi):
-                    dx = r_dpi[off] | (r_dpi[off + 1] << 8)
-                    dy = r_dpi[off + 2] | (r_dpi[off + 3] << 8)
-                    col = f"#{r_dpi[off+4]:02x}{r_dpi[off+5]:02x}{r_dpi[off+6]:02x}"
-                    stages.append({"stage": i + 1, "x_dpi": dx, "y_dpi": dy, "color_rgb": col})
-            summary["dpi"] = {"stages": stages}
-            emit("decoded", brand="mchose_v3", label="dpi", value=summary["dpi"])
+    # V3 uses a distinct 64-byte XOR frame and an exact receiver route above.
+    # Never infer this protocol from an output length or try the old 65-byte frame.
 
     # 分支 C: MCHOSE G7 (0xA8A5:0x2255)
     if (iface.vid, iface.pid) == (0xA8A5, 0x2255) and iface.output_len >= 33:
@@ -1293,6 +1245,23 @@ def run_interface_probes(dev: HidDevice, iface: HidInterface, emit: EmitFn) -> d
             'interface_verified':jbl.matches(iface),'battery_protocol_verified':False,
             'headphone_identity_verified':False,'note':jbl.LIMITATION}})
         emit('probe_skipped',reason='Smart Tx USB battery command unconfirmed; passive evidence only')
+        return results
+    profile = battery_catalog.profile_for(iface)
+    if profile and profile.protocol in ('mchose_headset', 'mchose_keyboard', 'mchose_v3', 'darmoshark_telink'):
+        if battery_catalog.matches_interface(iface):
+            merge_probe(profile.protocol, {})
+            try:
+                parsed, raw = battery_catalog._active_read(dev, iface, profile.protocol)
+                if parsed:
+                    value = {'level_percent': parsed[0], 'status': parsed[1], 'model': parsed[2]}
+                    merge_probe('monitor_battery_result', {'battery': value})
+                    emit('decoded', brand=profile.protocol, label='battery', value=value)
+                else:
+                    emit('query_no_result', brand=profile.protocol, query='battery')
+            except (OSError, ValueError) as exc:
+                emit('query_error', brand=profile.protocol, message=str(exc))
+        else:
+            emit('probe_skipped', reason='Not the matched wireless battery collection')
         return results
     if wk.matches(iface):
         try:

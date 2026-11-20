@@ -11,9 +11,13 @@ import time
 from hid_win import HidDevice
 import weisheng_keyboard as wk
 import darmoshark_m3pro as dm
+import darmoshark_telink as dt
 import gamesir_g7 as g7
 import delux_m618xsd as m618
 import ajazz_ak820 as ak820
+import mchose_headset as mh
+import mchose_keyboard as mk
+import mchose_v3_battery as mv3
 
 
 @dataclass(frozen=True)
@@ -38,6 +42,14 @@ CATALOG = {
     (0x372E, 0x1019): Profile('rk', 'RK Royal Kludge M3 鼠标'),
     (0x320F, 0x706E): Profile('hecate', '漫步者电竞 HECATE G3M Pro 鼠标'),
 }
+for _pid, (_mouse, _name) in dt.MODELS.items():
+    CATALOG[0x248A, _pid] = Profile('darmoshark_telink', _name)
+for _identity, _name in mh.MODELS.items():
+    CATALOG[_identity] = Profile('mchose_headset', _name)
+for _identity in mk.RECEIVERS:
+    CATALOG[_identity] = Profile('mchose_keyboard', mk.GENERIC)
+for _pid in mv3.RECEIVERS:
+    CATALOG[0x3837, _pid] = Profile('mchose_v3', mv3.GENERIC)
 for _pid, _model in ((0x2157, 'NJ07'), (0x2158, 'NJ08'), (0x2167, 'NJ07 MC'),
                      (0x2168, 'NJ08 MC'), (0x2177, 'NJ07 MC Pro'), (0x2178, 'NJ08 MC Pro')):
     CATALOG[0xA8A5, _pid] = Profile('ajazz', f'黑爵 AJAZZ {_model} 鼠标')
@@ -56,6 +68,10 @@ def matches_interface(iface):
     if not p:
         return False
     page, usage = iface.usage_page, iface.usage
+    if p.protocol == 'mchose_v3':return mv3.matches(iface)
+    if p.protocol == 'darmoshark_telink':return dt.matches(iface)
+    if p.protocol == 'mchose_headset':return mh.matches(iface)
+    if p.protocol == 'mchose_keyboard':return mk.matches(iface)
     if p.protocol == 'ajazz_ak820':return ak820.matches(iface)
     if p.protocol == 'delux_m618xsd':return m618.matches(iface)
     if p.protocol == 'gamesir_g7':return g7.matches(iface)
@@ -159,6 +175,10 @@ _io_lock = threading.Lock()
 
 
 def _active_read(dev, iface, protocol):
+    if protocol == 'darmoshark_telink':return dt.read(dev,iface)
+    if protocol == 'mchose_v3':return mv3.read(dev,iface)
+    if protocol == 'mchose_headset':return mh.read(dev,iface)
+    if protocol == 'mchose_keyboard':return mk.read(dev,iface)
     if protocol == 'ajazz_ak820':return ak820.read(dev,iface)
     if protocol == 'delux_m618xsd':return m618.read(dev,iface)
     if protocol == 'gamesir_g7':return g7.read(dev,iface)
@@ -277,6 +297,8 @@ def read(iface, result_type):
     if not profile:
         return None
     extra = {'model_name': profile.model}
+    if profile.protocol == 'mchose_headset':
+        extra['model_name'] = mh.model_name(iface)
     descriptor = f'{iface.manufacturer or ""} {iface.product or ""}'.strip()
     if (' / ' in profile.model and profile.protocol in ('aula', 'akko')
             and any(brand in descriptor.casefold() for brand in ('aula', 'ajazz', 'akko', 'monsgeek', '狼蛛', '黑爵', '艾酷'))):
@@ -309,6 +331,6 @@ def read(iface, result_type):
             extra['model_name'] = model
         return result_type(ok=True, level=level, raw_level=level, status=status,
                            source=source, raw=raw, extra=extra)
-    except OSError as error:
+    except (OSError, ValueError) as error:
         failure.detail = f'无法读取设备：{error}'
         return failure

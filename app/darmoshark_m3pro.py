@@ -6,6 +6,7 @@ Only GET state 0x81 is sent. Shared receiver identity is checked before mouse qu
 import time
 
 MODEL='达摩鲨 Darmoshark M3 Pro'
+MODELS = {0x0711: MODEL, 0x0710: '达摩鲨 Darmoshark M3S Pro'}
 
 
 def matches(d):
@@ -25,7 +26,7 @@ def body(raw,target):
     r=bytes(raw or b'')
     if len(r)!=65 or r[0]!=0:return None
     b=r[1:]
-    if b[0]!=target or b[2]!=0x8C:return None
+    if b[0]!=target or b[1]!=0 or b[2:4]!=b'\x8c\x01' or sum(b)&255!=0xA1:return None
     return b
 
 
@@ -51,8 +52,9 @@ def read(dev,d,emit=lambda *a,**k:None):
     model_id=int.from_bytes(receiver[11:13],'little')
     emit('decoded',brand='darmoshark_m3pro',label='receiver_identity',
          value={'model_id':model_id,'connected':bool(receiver[4]&8)})
-    if model_id!=0x0711 or not receiver[4]&8:return None,raw
+    model = MODELS.get(model_id)
+    if model is None or not receiver[4]&8:return None,raw
     mouse,raw=exchange(dev,0x41,emit)
     if mouse is None:return None,b''
     if mouse[5] not in (0,1) or mouse[6]>100:return None,raw
-    return (mouse[6],'charging' if mouse[5] else 'discharging',MODEL),raw
+    return (mouse[6],'charging' if mouse[5] else 'discharging',model),raw

@@ -199,7 +199,7 @@ def discover():
                 continue
             if k1.claims(d):
                 if k1.matches(d) and d.path not in used:
-                    found.append(Mouse(d.path,'GravaStar K1 · 2.4G（待核对型号）',d.vid_pid,
+                    found.append(Mouse(d.path,'共享无线键盘 · 仅 K1 已支持灯效（待核对型号）',d.vid_pid,
                                        'k1',k1.IDENTITY,interface=d))
                     used.add(d.path)
                 continue

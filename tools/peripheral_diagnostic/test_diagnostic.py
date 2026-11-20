@@ -23,6 +23,24 @@ def iface(**kwargs):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_new_catalog_interfaces_use_monitor_queries_once(self):
+        cases=[dict(vid=0x291d,pid=0x385d,usage_page=0xff90,feature_len=0),
+               dict(vid=0x3837,pid=0x1014,usage_page=0xff01,feature_len=0),
+               dict(vid=0x3554,pid=0xfa09,usage_page=0xff02,usage=2,input_len=20,output_len=20),
+               dict(vid=0x248a,pid=0xff31,usage_page=0x8c,input_len=33,output_len=33,feature_len=1001)]
+        for fields in cases:
+            d=iface(**fields);self.assertTrue(m.should_probe_interface(vars(d),False,set()))
+            dev=Mock()
+            with patch.object(probes.battery_catalog,'_active_read',return_value=((62,'unknown','fixture'),b'raw')) as read:
+                result=probes.run_interface_probes(dev,d,Mock())
+            self.assertEqual(result['capabilities']['battery']['level_percent'],62)
+            read.assert_called_once();dev.write_output.assert_not_called();dev.set_feature_report.assert_not_called()
+            d.usage=99
+            self.assertFalse(m.should_probe_interface(vars(d),True,set()))
+            with patch.object(probes.battery_catalog,'_active_read') as read:
+                probes.run_interface_probes(dev,d,Mock())
+            read.assert_not_called()
+
     def test_fa0303ce_rog_routes_query_correct_report_ids_and_offsets(self):
         # Interface identities came from fa0303ce; replies are synthetic.
         cases = [(0x1AD0,0xFF01,['03120700004b0214630f00'],75,['031207']),

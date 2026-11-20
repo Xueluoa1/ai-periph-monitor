@@ -6,8 +6,9 @@ import peripheral_protocols as pp
 from verify_wireless_battery import iface
 
 def reply(target=1,model=0x711,connected=True,level=47,charge=0):
-    r=bytearray(65);r[1]=target;r[3]=0x8c;r[5]=8 if connected else 0
+    r=bytearray(65);r[1]=target;r[3]=0x8c;r[4]=1;r[5]=8 if connected else 0
     r[6]=charge;r[7]=level;r[12:14]=model.to_bytes(2,'little')
+    r[-1]=(0xa1-sum(r[1:-1]))&255
     return bytes(r)
 
 class DarmosharkTests(unittest.TestCase):
@@ -26,7 +27,7 @@ class DarmosharkTests(unittest.TestCase):
         with self.assertRaises(ValueError):dm.request(2)
 
     def test_model_gate_blocks_mouse_query(self):
-        for response in (reply(model=0x710),reply(connected=False)):
+        for response in (reply(model=0x712),reply(connected=False)):
             with patch.object(dm,'exchange',return_value=(response[1:],response)) as query:
                 self.assertIsNone(dm.read(Mock(),self.d)[0])
             query.assert_called_once()
@@ -39,7 +40,16 @@ class DarmosharkTests(unittest.TestCase):
             self.assertEqual([c.args[0] for c in dev.write_output.call_args_list],[dm.request(1),dm.request(65)])
             dev.set_feature_report.assert_not_called()
 
+    def test_m3s_pro_logged_identity_then_battery_query(self):
+        receiver=bytes.fromhex('0001008c01081519230703011007000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000098')
+        dev=Mock();dev.read_input.side_effect=[receiver,reply(65,model=0x710,level=61)]
+        parsed,_=dm.read(dev,self.d)
+        self.assertEqual(parsed,(61,'discharging',dm.MODELS[0x710]))
+        self.assertEqual(dev.write_output.call_count,2)
+
     def test_invalid_frames_are_not_battery(self):
+        corrupt=bytearray(reply(65));corrupt[7]^=1
+        self.assertIsNone(dm.body(corrupt,65))
         self.assertIsNone(dm.body(dm.request(65),65))
         self.assertIsNone(dm.body(reply(),65))
         self.assertIsNone(dm.body(reply(65)[:-1],65))

@@ -86,7 +86,7 @@ class K1Tests(unittest.TestCase):
 
     def test_battery_route_is_terminal(self):
         failed=battery.BatteryResult(ok=False)
-        with patch.object(k,'battery_read',return_value=failed) as reader,patch.object(battery.wireless,'read') as other:
+        with patch.object(battery.peripheral,'read',return_value=failed) as reader,patch.object(battery.wireless,'read') as other:
             self.assertEqual(battery._read_battery_unlocked(iface(),0),[failed]);other.assert_not_called();reader.assert_called_once()
         self.assertFalse(battery._is_candidate_interface(iface(output_len=17),[]))
 

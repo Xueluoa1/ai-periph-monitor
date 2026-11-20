@@ -1417,7 +1417,7 @@ def _read_battery_unlocked(iface: HidInterface, listen_seconds: float = 3.0,
         return [BatteryResult(ok=False, source='接收器识别',
             detail='用户确认此接收器连接 RK-G98；共用 ID 无法自动核实型号，2.4G 电量和灯效协议尚未确认')]
     if k1.claims(iface):
-        return [k1.battery_read(iface, BatteryResult)]
+        return [peripheral.read(iface, BatteryResult)]
     if am_battery.supports_device(iface):
         return [am_battery.read(iface, BatteryResult)]
     # Exact receiver routes are terminal: a failed query must not fall through
@@ -1704,7 +1704,7 @@ def resolve_full_model_name(iface: HidInterface,
         return asus_channel_title(iface)
 
     if k1.claims(iface):
-        return 'GravaStar K1 系列接收器（型号待确认）'
+        return peripheral.mk.GENERIC
     if is_unidentified_logged_receiver(iface):
         return 'RK-G98（用户确认的共享接收器）'
 

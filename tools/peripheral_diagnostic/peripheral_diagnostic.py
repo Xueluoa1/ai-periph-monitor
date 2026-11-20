@@ -40,9 +40,10 @@ from hid_win import HidInterface, enumerate_hid
 from protocol_probes import BRAND_VIDS, HidDevice, report_ids_for, run_interface_probes
 import hid_evidence
 import receiver_battery
+import peripheral_protocols as battery_catalog
 
 VERSION = "1.5.0"
-BUILD_ID = '20261103-rog-harpe2-pelta'
+BUILD_ID = '20261120-mchose-darmoshark'
 WORKER_TIMEOUT_S = 18.0
 INVENTORY_TIMEOUT_S = 20.0
 TOTAL_TIMEOUT_S = 180.0
@@ -129,6 +130,9 @@ def should_probe_interface(iface_rec: dict, probe_all: bool, extra_vids: set[int
         candidate = SimpleNamespace(**iface_rec)
         if receiver_battery.profile_for(candidate):
             return receiver_battery.matches(candidate)
+        profile = battery_catalog.profile_for(candidate)
+        if profile and profile.protocol in ('mchose_headset', 'mchose_keyboard', 'mchose_v3', 'darmoshark_telink'):
+            return battery_catalog.matches_interface(candidate)
 
     # 跳过纯系统鼠标/键盘/多媒体输入通道 (无 Feature Report 且 Output<=4B 仅为 CapsLock 指示灯)
     if up in (0x0001, 0x000C) and feat_len == 0 and out_len <= 4:
