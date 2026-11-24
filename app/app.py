@@ -865,12 +865,14 @@ def build_ui():
             wait_ms=int(v_wait.get()),
             scale=int(v_scale.get()),
             charging_offset=int(v_chg.get()) if v_chg.get().strip() else None,
+            mode=v_kind.get(),
             notes="用户自定义（手动标定）",
         )
 
     def test_cal():
         try:
             spec = build_spec()
+            iface = state["cal_ifaces"][cb_iface.current()]
         except Exception as e:
             append_text(txt_cal, f"参数有误：{e}")
             return
@@ -878,9 +880,8 @@ def build_ui():
                           f"请求={spec.payload}\n")
 
         def work():
-            iface = state["cal_ifaces"][cb_iface.current()]
             lines = []
-            kind = "feature" if iface.feature_len else "output"
+            kind = spec.mode
             try:
                 with HidDevice(iface.path, write=True) as dev:
                     for i in range(2):
@@ -894,7 +895,7 @@ def build_ui():
             except Exception as e:
                 lines.append(f"出错：{e}")
             if kind == "output":
-                lines.insert(0, "提示：该接口没有 Feature Report，已按 Output→Input 方式发送。")
+                lines.insert(0, "已按所选 output：发送 Output Report，再读取 Input Report。")
             return lines
 
         run_bg(work, lambda lines: set_text(txt_cal, "\n".join(lines)))

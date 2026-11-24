@@ -281,7 +281,12 @@ class VendorControlTests(unittest.TestCase):
         d=iface(0x373B,0x101A,usage_page=0xFF02,usage=2,input_len=17,output_len=17)
         for identity in ms.ATK_MODELS:
             mouse=ms.Mouse(d.path,'ATK',d.vid_pid,'atk',identity,interface=d)
-            self.assertEqual(mc.supported(mouse),identity != ms.r1nk.IDENTITY)
+            self.assertEqual(mc.supported(mouse),identity in ((1,8),(2,39),(2,43),(2,83)))
+        # A9 Master has DPI support on its own receiver, not these 1K controls.
+        d.pid=0x1279
+        for identity in ((1,39),(1,53)):
+            mouse=ms.Mouse(d.path,'ATK',d.vid_pid,'atk',identity,interface=d)
+            self.assertFalse(mc.supported(mouse))
         mouse.identity=(255,255);self.assertFalse(mc.supported(mouse))
 
     def test_optional_lighting_failure_leaves_rate_available_but_blocks_light_write(self):

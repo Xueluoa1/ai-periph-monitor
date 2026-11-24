@@ -67,7 +67,10 @@ def readings_from(snapshot):
             raise ValueError('Invalid device key')
         if r.level is not None and (type(r.level) is not int or not 0 <= r.level <= 100):
             raise ValueError('Invalid percentage')
-        if r.level_label not in BATTERY_LABELS:
+        voltage_label = (r.level is None and type(r.voltage_mv) is int
+                         and 2500 <= r.voltage_mv <= 4500
+                         and r.level_label == f'{r.voltage_mv/1000:.2f}V')
+        if r.level_label not in BATTERY_LABELS and not voltage_label:
             raise ValueError('Invalid battery category')
         if r.updated_at is not None and not isinstance(r.updated_at, (int, float)):
             raise ValueError('Invalid timestamp')

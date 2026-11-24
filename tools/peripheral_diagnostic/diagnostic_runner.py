@@ -62,6 +62,7 @@ def adaptation_report(folder, records, outcomes, m):
                               '读取值和解码候选不是写入能力验证；未读到不代表设备不支持。',
                               '灯光和回报率等字段仍需按具体型号、固件及官方协议核对。']}
     lines = ['多品牌外设诊断 v' + m.VERSION, '电量 / DPI / 回报率 / 灯光',
+             '构建：' + getattr(m, 'BUILD_ID', 'unknown'),
              '采集时间：' + datetime.now().astimezone().isoformat(timespec='seconds'),
              '', '本次不修改设备设置。请把完整 ZIP 交回进行适配。',
              '读取结果仅作候选；未验证任何写入功能。', '']
@@ -132,6 +133,7 @@ def export_archive(folder, destination, m):
 
 def run(args, m):
     print(f'多品牌外设诊断 v{m.VERSION} — 电量 / DPI / 回报率 / 灯光', flush=True)
+    print('构建：' + getattr(m, 'BUILD_ID', 'unknown'), flush=True)
     print('请保持接收器连接，唤醒鼠标和键盘。采集不会修改设备设置。', flush=True)
     print('通常需要数十秒；接口较多或驱动超时时最多约 3 分钟。', flush=True)
     run_id = uuid.uuid4().hex[:8]

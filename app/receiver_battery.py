@@ -10,6 +10,7 @@ import time
 from hid_win import HidDevice
 import wireless_battery as wireless
 import sony_inzone_battery as sony
+import barracuda_x
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,10 @@ def _add(vid, protocol, models):
 
 _add(0x0B05, 'rog_harpe2', {0x1AD0: 'ROG 龙鳞 ACE 2 / SPEEDNOVA 8K 鼠标'})
 _add(0x0B05, 'rog_pelta', {0x1B84: 'ROG PELTA（破风）无线耳机'})
+_add(0x1532, 'barracuda_x_voltage', {0x0550: '雷蛇 Razer Barracuda X（梭鱼 X）耳机'})
+# 1A05 is reported as cable mode by hardware evidence; conflicting catalogs
+# are insufficient to register it as a wireless receiver.
+_add(0x391D, 'vgn3_master', {0x1005: 'VGN 蜻蜓 3 Master+（大师三）鼠标'})
 
 
 _add(0x1038, 'nova7_percent', {
@@ -151,6 +156,10 @@ def matches(iface):
         return False
     page, usage = iface.usage_page, iface.usage
     inp, out, feature = iface.input_len, iface.output_len, iface.feature_len
+    if p.protocol == 'barracuda_x_voltage':
+        return barracuda_x.matches(iface)
+    if p.protocol == 'vgn3_master':
+        return (page,usage,inp,out)==(0xFF02,2,17,17)
     if p.protocol in ('rog_harpe2', 'rog_pelta'):
         page_expected = 0xFF01 if p.protocol == 'rog_harpe2' else 0xFF00
         return (page, usage, inp, out) == (page_expected, 1, 64, 64)
@@ -309,7 +318,7 @@ def decode(protocol, raw):
     elif protocol == 'keychron':
         if len(r) == 64 and r[:2] == b'\xb4\x06':
             return _percentage(r[20])
-    elif protocol == 'hitscan':
+    elif protocol in ('hitscan','vgn3_master'):
         try:
             result = wireless.decode_compx(r)
         except ValueError:
@@ -369,6 +378,11 @@ def query(dev, iface):
     if not matches(iface):
         raise ValueError('不是已核实的无线接收器电量接口')
     protocol = profile_for(iface).protocol
+    if protocol == 'barracuda_x_voltage':
+        result=barracuda_x.read_voltage(dev,iface)
+        if result is None:return None
+        mv,raw=result
+        return Reading(level=None,label=f'{mv/1000:.2f}V',voltage_mv=mv,raw=raw)
     parse = lambda raw: decode(protocol, raw)
     if protocol in ('rog_harpe2', 'rog_pelta'):
         rid = 3 if protocol == 'rog_harpe2' else 0xCC
@@ -427,7 +441,8 @@ def query(dev, iface):
                   'betop_kp_plain': b'\x02\x15', 'hyperx_alpha2': b'\x50\x02',
                   'flydigi_apex5': bytes.fromhex('035aa5010203'),
                   'flydigi_vader5': bytes.fromhex('005aa5010203'),
-                  'hitscan': bytes.fromhex('0804000000000000000000000000000049')}[protocol]
+                  'hitscan': bytes.fromhex('0804000000000000000000000000000049'),
+                  'vgn3_master': bytes.fromhex('0804000000000000000000000000000049')}[protocol]
     packet = prefix.ljust(iface.feature_len if protocol == 'keychron' else iface.output_len, b'\0')
     result, raw = _input_query(dev, iface, packet, parse, feature=protocol == 'keychron')
     if result is None:
@@ -459,7 +474,7 @@ def read(iface, result_type):
     try:
         with HidDevice(iface.path, write=not passive) as dev:
             result = query(dev, iface)
-    except OSError as exc:
+    except (OSError,ValueError) as exc:
         return result_type(ok=False, source=source, extra=extra, detail=f'电量查询失败：{exc}')
     if result is None:
         return result_type(ok=False, source=source, extra=extra,

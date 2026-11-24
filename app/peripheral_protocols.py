@@ -18,6 +18,7 @@ import ajazz_ak820 as ak820
 import mchose_headset as mh
 import mchose_keyboard as mk
 import mchose_v3_battery as mv3
+import log_devices_20261122 as log_devices
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,10 @@ class Profile:
 
 
 CATALOG = {
+    (0x35BB, 0xA00B): Profile('hecate_g5', log_devices.HECATE_NAME),
+    (0x35BB, 0xA22D): Profile('hecate_g4', log_devices.HECATE_G4_NAME),
+    (0x24AE, 0x1464): Profile('rapoo_v2', log_devices.RAPOO_NAME),
+    (0x05AC, 0x024F): Profile('sonix_keyboard', log_devices.SONIX_NAME),
     (0x1A2C, 0x8FFF): Profile('ajazz_ak820', ak820.MODEL),
     (0x320F, 0x221D): Profile('delux_m618xsd', m618.MODEL),
     (0x3537, 0x10B9): Profile('gamesir_g7', g7.MODEL),
@@ -68,6 +73,8 @@ def matches_interface(iface):
     if not p:
         return False
     page, usage = iface.usage_page, iface.usage
+    if p.protocol in ('hecate_g5','hecate_g4','rapoo_v2','sonix_keyboard'):
+        return log_devices.matches(iface,p.protocol)
     if p.protocol == 'mchose_v3':return mv3.matches(iface)
     if p.protocol == 'darmoshark_telink':return dt.matches(iface)
     if p.protocol == 'mchose_headset':return mh.matches(iface)
@@ -104,6 +111,8 @@ def matches_interface(iface):
 def decode(protocol, raw, *, command=0x10, sequence=0, descriptor=''):
     """Return (percentage, status, model override), or None for unrelated data."""
     r = bytes(raw or b'')
+    if protocol in ('hecate_g5','hecate_g4','rapoo_v2','sonix_keyboard'):
+        return log_devices.decode(protocol,r)
     if protocol == 'weisheng_keyboard':return wk.decode(r)
     value, status, model = None, 'unknown', ''
     if protocol == 'dareu' and len(r) == 17 and r[:2] == b'\x08\x04':
@@ -175,6 +184,8 @@ _io_lock = threading.Lock()
 
 
 def _active_read(dev, iface, protocol):
+    if protocol in ('hecate_g5','hecate_g4','rapoo_v2','sonix_keyboard'):
+        return log_devices.read(dev,iface,protocol)
     if protocol == 'darmoshark_telink':return dt.read(dev,iface)
     if protocol == 'mchose_v3':return mv3.read(dev,iface)
     if protocol == 'mchose_headset':return mh.read(dev,iface)
@@ -310,7 +321,7 @@ def read(iface, result_type):
         failure.detail = '该接口不是已核实的电量通道'
         return failure
     try:
-        if profile.protocol in ('incott', 'delux'):
+        if profile.protocol in ('incott', 'delux', 'rapoo_v2'):
             with _listeners_lock:
                 listener = _listeners.get(iface.path)
                 if listener is None or not listener.thread.is_alive():

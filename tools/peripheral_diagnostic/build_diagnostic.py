@@ -32,6 +32,8 @@ def main(output_dir=None):
         z.write(root / 'docs' / '适配说明-北通八位堂与耳机.md', '适配说明-北通八位堂与耳机.md')
         z.write(root / 'docs' / '适配说明-龙鳞ACE2与破风耳机.md', '适配说明-龙鳞ACE2与破风耳机.md')
         z.write(root / 'docs' / '适配说明-20261120.md', '适配说明-20261120.md')
+        z.write(root / 'docs' / '适配说明-20261122.md', '适配说明-20261122.md')
+        z.write(root / 'docs' / '适配说明-20261124.md', '适配说明-20261124.md')
     print(target)
 
 

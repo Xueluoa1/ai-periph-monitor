@@ -46,6 +46,9 @@ def claims(d):
 
 def route(d):
     identity = (d.vid, d.pid)
+    # AX5 V2 logs declare a different Feature channel; never send V2 11/12 queries.
+    if identity == (0x5253,0x1020):
+        return None
     if identity == (0x36A7, 0xA887) and d.usage_page == 0xFF1C and d.output_len == 64 and d.input_len == 64:
         return 'beast4k'
     if identity in PAGE_MODELS and d.usage_page == 0xFFFF and d.feature_len in (64, 65):

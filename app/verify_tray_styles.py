@@ -62,8 +62,11 @@ class StyleTests(unittest.TestCase):
         app.cfg = copy.deepcopy(tc.DEFAULT_CONFIG)
         app.update_icons, app.hide_hover, app.refresh_now = Mock(), Mock(), Mock()
         new = dict(app.cfg, taskbar_icon_style='ring')
-        with patch.object(tc, 'load_config', return_value=new), patch.object(tc, 'sync_widget_state'):
+        with patch.object(tc, 'load_config', return_value=new), patch.object(tc, 'sync_widget_state'), \
+             patch.object(tc, 'is_autostart_enabled', return_value=new['autostart']), \
+             patch.object(tc, 'save_config') as save:
             app.apply_config()
+            save.assert_not_called()
         app.update_icons.assert_called_once()
         app.refresh_now.assert_not_called()
         app.hwnd, app.active_uids = 1, set()

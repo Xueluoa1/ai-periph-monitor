@@ -32,7 +32,9 @@ def decode(raw):
     if r[2] == 1 and reduce(xor, r[2:8+length], 0) != r[8+length]:
         return None
     data = r[8:8+length]
-    if int.from_bytes(data[:2], 'little') != 0x3837 or data[10] != 1:
+    # Receiver firmware can report either connected state 1 or 2.
+    # Keep rejecting disconnected/unknown values instead of accepting any byte.
+    if int.from_bytes(data[:2], 'little') != 0x3837 or data[10] not in (1, 2):
         return None
     if data[11] not in (0, 1) or data[12] > 100:
         return None

@@ -23,6 +23,57 @@ def iface(**kwargs):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_a9_master_uses_new_dpi_addresses_without_writes(self):
+        import mouse_settings as ms
+        d=iface(vid=0x373B,pid=0x1279,usage_page=0xff02,usage=2,input_len=17,output_len=17)
+        header=bytes.fromhex('015402530154')
+        rows=[ms.atk_encode(v,v,'master') for v in (800,1600)]
+        dev=Mock()
+        with patch.object(ms,'atk_identity',return_value=(1,53)),patch.object(ms,'atk_profile',return_value=1),\
+             patch.object(ms,'atk_read',side_effect=[header,*rows,header]) as reader,\
+             patch.object(probes,'_atk_exchange',return_value=None):
+            result=probes.probe_atk_compx(dev,d,Mock())
+        self.assertEqual(result['dpi']['stages'],[(800,800),(1600,1600)])
+        self.assertEqual([c.args[2:] for c in reader.call_args_list],[(0,6),(0x1B00,6),(0x1B06,6),(0,6)])
+        dev.write_output.assert_not_called();dev.set_feature_report.assert_not_called()
+
+    def test_a9_unknown_pairing_stops_dpi_but_keeps_battery_query(self):
+        import mouse_settings as ms
+        d=iface(vid=0x373B,pid=0x1279,usage_page=0xff02,usage=2,input_len=17,output_len=17)
+        with patch.object(ms,'atk_identity',return_value=(255,255)),patch.object(ms,'atk_read') as reader,\
+             patch.object(probes,'_atk_exchange',return_value=None) as battery:
+            result=probes.probe_atk_compx(Mock(),d,Mock())
+        self.assertNotIn('dpi',result);reader.assert_not_called();battery.assert_called_once()
+
+    def test_nov21_hola_identity_extended_battery_route(self):
+        d=iface(vid=0x3554,pid=0xfa09,usage_page=0xff02,usage=2,input_len=20,output_len=20,path='fixture')
+        online=bytes.fromhex('130701000101000000000000000000000000001d')
+        identity=bytes.fromhex('130501000a0300000001a70100000000000000cf')
+        keyboard=probes.battery_catalog.mk
+        dev=Mock();dev.read_input.side_effect=[online,identity,keyboard.transport.frame(0x4a,b'\x50\0'),online,identity]
+        with patch.object(keyboard.transport,'report_ids',return_value={19}):
+            result=probes.run_interface_probes(dev,d,Mock())
+        self.assertEqual(result['capabilities']['battery']['model'],keyboard.HOLA_NAME)
+        self.assertEqual(result['capabilities']['battery']['level_percent'],80)
+        self.assertEqual([c.args[0][1] for c in dev.write_output.call_args_list],[7,5,0x4a,7,5])
+
+    def test_nov21_barracuda_uses_voltage_not_mouse_feature(self):
+        d=iface(vid=0x1532,pid=0x550,usage_page=0xff00,feature_len=0)
+        self.assertTrue(m.should_probe_interface(vars(d),False,set()))
+        dev=Mock()
+        with patch.object(probes.receiver_catalog.barracuda_x,'read_voltage',return_value=(3975,b'raw')):
+            result=probes.run_interface_probes(dev,d,Mock())
+        battery=result['capabilities']['battery']
+        self.assertIsNone(battery['level_percent']);self.assertEqual(battery['voltage_mv'],3975)
+        dev.set_feature_report.assert_not_called();dev.get_feature_report.assert_not_called()
+
+    def test_ax5_v2_does_not_receive_unrelated_mchose_queries(self):
+        d=iface(vid=0x5253,pid=0x1020,usage_page=0xff01,feature_len=64)
+        dev=Mock()
+        with patch.object(probes,'probe_other_and_generic',return_value={}):
+            probes.run_interface_probes(dev,d,Mock())
+        dev.set_feature_report.assert_not_called();dev.write_output.assert_not_called()
+
     def test_new_catalog_interfaces_use_monitor_queries_once(self):
         cases=[dict(vid=0x291d,pid=0x385d,usage_page=0xff90,feature_len=0),
                dict(vid=0x3837,pid=0x1014,usage_page=0xff01,feature_len=0),

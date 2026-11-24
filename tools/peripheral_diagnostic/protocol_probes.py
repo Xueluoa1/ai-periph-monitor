@@ -91,6 +91,11 @@ class HidDevice(hw.HidDevice):
         self.trace('transport_tx',method='set_feature_query',hex=data.hex())
         return super().set_feature_report(data)
 
+    def get_input_report(self,report_id,length):
+        raw=super().get_input_report(report_id,length)
+        self.trace('transport_rx',method='get_input_report',report_id=report_id,hex=raw.hex())
+        return raw
+
     def set_feature(self, data: bytes) -> bool:
         try:
             self.set_feature_report(data)
@@ -417,6 +422,37 @@ def _atk_decode_dpi_both(data: bytes) -> dict:
 
 def probe_atk_compx(dev: HidDevice, iface: HidInterface, emit: EmitFn) -> dict:
     summary: dict = {"brand": "ATK / VXE / Compx"}
+    if ((iface.vid,iface.pid)==(0x373B,0x1279) and
+            (iface.usage_page,iface.usage,iface.input_len,iface.output_len)==(0xFF02,2,17,17)):
+        import mouse_settings as ms
+        try:
+            identity=ms.atk_identity(dev,iface)
+            summary['identity']={'cid':identity[0],'mid':identity[1]}
+            emit('decoded',brand='atk_compx',label='identity',value=summary['identity'])
+            spec=ms.atk_model(identity,iface)
+            if spec is None or spec[1]!='master':raise ValueError('接收器内鼠标尚未确认是 A9 Ultimate +')
+            summary['identity']['model']=spec[0]
+            profile=ms.atk_profile(dev,iface)
+            header=ms.atk_read(dev,iface,0,6)
+            if (len(header)!=6 or any(sum(header[i:i+2])&255!=0x55 for i in (0,2,4))
+                    or not 1<=header[2]<=8 or not 0<=header[4]<header[2]):
+                raise ValueError('PAW3955 档位头无效')
+            rows=[ms.atk_read(dev,iface,0x1B00+i*6,6) for i in range(header[2])]
+            stages=[ms.atk_decode(row,'master') for row in rows]
+            if any(not 1<=v<=50000 for row in stages for v in row):raise ValueError('DPI 超出范围')
+            if ms.atk_profile(dev,iface)!=profile or ms.atk_read(dev,iface,0,6)!=header:
+                raise ValueError('采集期间配置已变化')
+            summary['dpi']={'model':spec[0],'profile':profile,'active_stage':header[4]+1,'stages':stages,
+                            'codec':'PAW3955 Master 6-byte @ 0x1B00'}
+            emit('decoded',brand='atk_compx',label='dpi',value=summary['dpi'])
+        except (OSError,ValueError) as exc:
+            emit('query_error',brand='atk_compx',message=str(exc))
+        # Preserve the independent battery query even if configuration is unavailable.
+        r=_atk_exchange(dev,iface,emit,'battery_cmd04',4,(),lambda b:b[0]==4)
+        if r and r[1]==0 and 2<=r[4]<=10 and r[5]<=100 and r[6] in (0,1):
+            summary['battery']={'level_percent':r[5],'charging':bool(r[6])}
+            emit('decoded',brand='atk_compx',label='battery',value=summary['battery'])
+        return summary
     # 分支 A: Nordic 54L15 0xFF05 64B 电量协议
     if iface.usage_page == 0xFF05 and iface.output_len >= 64:
         pkt = bytes([0x08, 0x7D, 0x72, 0x02, 0x00, 0x01, 0x07, 0x01]).ljust(iface.output_len, b"\x00")
@@ -1019,6 +1055,9 @@ def _mchose_v2_query(dev: HidDevice, emit: EmitFn, label: str, report_id: int, s
 
 def probe_mchose(dev: HidDevice, iface: HidInterface, emit: EmitFn) -> dict:
     summary: dict = {"brand": "MCHOSE (迈从)"}
+    if (iface.vid,iface.pid)==(0x5253,0x1020):
+        emit('probe_skipped',reason='AX5 V2 uses another protocol; V2 Feature 11/12 queries disabled')
+        return summary
     feat_ids = set(report_ids_for(dev, 2))
     # 分支 A: M HUB V2 (Feature 0x11 & 0x12, UsagePage 0xFF01)
     if {0x11, 0x12}.issubset(feat_ids) or (iface.usage_page == 0xFF01 and (dev.caps.FeatureReportByteLength or 0) == 32):
@@ -1247,7 +1286,8 @@ def run_interface_probes(dev: HidDevice, iface: HidInterface, emit: EmitFn) -> d
         emit('probe_skipped',reason='Smart Tx USB battery command unconfirmed; passive evidence only')
         return results
     profile = battery_catalog.profile_for(iface)
-    if profile and profile.protocol in ('mchose_headset', 'mchose_keyboard', 'mchose_v3', 'darmoshark_telink'):
+    if profile and profile.protocol in ('mchose_headset', 'mchose_keyboard', 'mchose_v3', 'darmoshark_telink',
+                                       'hecate_g5','hecate_g4','rapoo_v2','sonix_keyboard'):
         if battery_catalog.matches_interface(iface):
             merge_probe(profile.protocol, {})
             try:

@@ -43,7 +43,7 @@ import receiver_battery
 import peripheral_protocols as battery_catalog
 
 VERSION = "1.5.0"
-BUILD_ID = '20261120-mchose-darmoshark'
+BUILD_ID = '20261124-a9-feedback'
 WORKER_TIMEOUT_S = 18.0
 INVENTORY_TIMEOUT_S = 20.0
 TOTAL_TIMEOUT_S = 180.0
@@ -131,7 +131,8 @@ def should_probe_interface(iface_rec: dict, probe_all: bool, extra_vids: set[int
         if receiver_battery.profile_for(candidate):
             return receiver_battery.matches(candidate)
         profile = battery_catalog.profile_for(candidate)
-        if profile and profile.protocol in ('mchose_headset', 'mchose_keyboard', 'mchose_v3', 'darmoshark_telink'):
+        if profile and profile.protocol in ('mchose_headset', 'mchose_keyboard', 'mchose_v3', 'darmoshark_telink',
+                                           'hecate_g5','hecate_g4','rapoo_v2','sonix_keyboard'):
             return battery_catalog.matches_interface(candidate)
 
     # 跳过纯系统鼠标/键盘/多媒体输入通道 (无 Feature Report 且 Output<=4B 仅为 CapsLock 指示灯)

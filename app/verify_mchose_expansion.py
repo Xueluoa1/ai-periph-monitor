@@ -25,12 +25,21 @@ class MchoseExpansionTests(unittest.TestCase):
         raw[8:22]=bytes.fromhex('3738264001000000000001005000')
         raw[22]=reduce(xor,raw[2:22],0)
         self.assertEqual(mv3.decode(raw),(80,'discharging'))
+        for state in (1,2):
+            for charge in (0,1):
+                for level in (0,80,100):
+                    wireless=bytearray(raw)
+                    wireless[18:21]=bytes((state,charge,level))
+                    wireless[22]=reduce(xor,wireless[2:22],0)
+                    self.assertEqual(mv3.decode(wireless),(level,'charging' if charge else 'discharging'))
+                    wireless[22]^=1
+                    self.assertIsNone(mv3.decode(wireless))
         self.assertEqual(mv3.request()[:9].hex(),'4d0101000009000008')
         dev=Mock();dev.read_input.return_value=bytes(raw)
         parsed,_=mv3.read(dev,d)
         self.assertIn('A7 V3 Ultra+',parsed[2])  # PID 4026 must not rename it A5.
         d.product='Receiver';self.assertEqual(mv3.read(dev,d)[0][2],mv3.GENERIC)
-        for offset,value in ((0,0),(1,0),(3,60),(4,2),(18,0),(19,2),(20,101)):
+        for offset,value in ((0,0),(1,0),(3,60),(4,2),(18,0),(18,3),(18,255),(19,2),(20,101)):
             bad=bytearray(raw);bad[offset]=value;bad[22]=reduce(xor,bad[2:22],0)
             self.assertIsNone(mv3.decode(bad))
         bad=bytearray(raw);bad[22]^=1;self.assertIsNone(mv3.decode(bad))
