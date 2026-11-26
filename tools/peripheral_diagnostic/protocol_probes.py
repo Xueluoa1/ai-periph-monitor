@@ -171,6 +171,18 @@ BRAND_VIDS: dict[int, str] = {
 }
 
 
+def receiver_label(iface: HidInterface) -> str:
+    """Name the receiver before pairing is queried. An OEM VID can span brands."""
+    if (iface.vid, iface.pid) == (0x320F, 0x221D):
+        return '多彩 DELUX M618XSD（用户型号与官方驱动核对）'
+    if (iface.vid, iface.pid) == (0x1A2C, 0x8FFF):
+        return 'XY 2.4G 键盘接收器（含黑爵 AK820 Max Plus，共用 ID）'
+    profile = battery_catalog.profile_for(iface)
+    if profile:
+        return profile.model
+    return BRAND_VIDS.get(iface.vid, f'未知/其他 (0x{iface.vid:04X})')
+
+
 def report_ids_for(dev: HidDevice, report_type: int) -> list[int]:
     """同时从 ValueCaps 与 ButtonCaps 提取接口声明的所有 Report ID。"""
     ids = {int(cap.ReportID) for cap in dev.value_caps(report_type)}
@@ -378,14 +390,15 @@ def _atk_frame(cmd: int, payload: tuple[int, ...] = (), out_len: int = 17) -> by
 
 
 def _atk_exchange(dev: HidDevice, iface: HidInterface, emit: EmitFn, label: str,
-                  cmd: int, payload: tuple[int, ...] = (), accept=lambda b: True) -> Optional[bytes]:
+                  cmd: int, payload: tuple[int, ...] = (), accept=lambda b: True,
+                  *, attempts=2, timeout=.45) -> Optional[bytes]:
     out_len = dev.caps.OutputReportByteLength or iface.output_len or 17
     pkt = _atk_frame(cmd, payload, out_len)
-    for attempt in range(2):
+    for attempt in range(attempts):
         dev.drain()
         emit("tx", brand="atk_compx", label=label, attempt=attempt + 1, method="output", hex=pkt.hex())
         dev.write_output(pkt, use_hidd=False)
-        deadline = time.monotonic() + 0.45
+        deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             r = dev.read_input(timeout_ms=100)
             if not r:
@@ -425,8 +438,23 @@ def probe_atk_compx(dev: HidDevice, iface: HidInterface, emit: EmitFn) -> dict:
     if ((iface.vid,iface.pid)==(0x373B,0x1279) and
             (iface.usage_page,iface.usage,iface.input_len,iface.output_len)==(0xFF02,2,17,17)):
         import mouse_settings as ms
+        # A slow or unavailable configuration channel must not consume the
+        # worker's time budget before the independent battery query runs.
         try:
-            identity=ms.atk_identity(dev,iface)
+            r=_atk_exchange(dev,iface,emit,'battery_cmd04',4,(),lambda b:
+                b[:2]==b'\x04\x00' and 2<=b[4]<=10 and b[5]<=100 and b[6] in (0,1),
+                attempts=1,timeout=3.0)
+            if r:
+                summary['battery']={'level_percent':r[5],'charging':bool(r[6])}
+                emit('decoded',brand='atk_compx',label='battery',value=summary['battery'])
+        except OSError as exc:
+            emit('query_error',brand='atk_compx',label='battery',message=str(exc))
+
+        def report(label,value):
+            emit('decoded',brand='atk_compx',label=label,value=value)
+
+        try:
+            identity=ms.atk_identity(dev,iface,report=report)
             summary['identity']={'cid':identity[0],'mid':identity[1]}
             emit('decoded',brand='atk_compx',label='identity',value=summary['identity'])
             spec=ms.atk_model(identity,iface)
@@ -447,11 +475,6 @@ def probe_atk_compx(dev: HidDevice, iface: HidInterface, emit: EmitFn) -> dict:
             emit('decoded',brand='atk_compx',label='dpi',value=summary['dpi'])
         except (OSError,ValueError) as exc:
             emit('query_error',brand='atk_compx',message=str(exc))
-        # Preserve the independent battery query even if configuration is unavailable.
-        r=_atk_exchange(dev,iface,emit,'battery_cmd04',4,(),lambda b:b[0]==4)
-        if r and r[1]==0 and 2<=r[4]<=10 and r[5]<=100 and r[6] in (0,1):
-            summary['battery']={'level_percent':r[5],'charging':bool(r[6])}
-            emit('decoded',brand='atk_compx',label='battery',value=summary['battery'])
         return summary
     # 分支 A: Nordic 54L15 0xFF05 64B 电量协议
     if iface.usage_page == 0xFF05 and iface.output_len >= 64:
@@ -1239,7 +1262,7 @@ def run_interface_probes(dev: HidDevice, iface: HidInterface, emit: EmitFn) -> d
     """根据 VID/PID 与 UsagePage 调度对应品牌协议探测 + 通用 Feature 快照。"""
     vid = iface.vid
     results: dict = {
-        "brand_detected": BRAND_VIDS.get(vid, f"VID_0x{vid:04X}"),
+        "brand_detected": receiver_label(iface),
         "probes_executed": [],
         "capabilities": {},
     }
@@ -1286,8 +1309,9 @@ def run_interface_probes(dev: HidDevice, iface: HidInterface, emit: EmitFn) -> d
         emit('probe_skipped',reason='Smart Tx USB battery command unconfirmed; passive evidence only')
         return results
     profile = battery_catalog.profile_for(iface)
-    if profile and profile.protocol in ('mchose_headset', 'mchose_keyboard', 'mchose_v3', 'darmoshark_telink',
-                                       'hecate_g5','hecate_g4','rapoo_v2','sonix_keyboard'):
+    if profile and profile.protocol in ('incott', 'mchose_headset', 'mchose_keyboard', 'mchose_v3', 'darmoshark_telink',
+                                       'hecate_g5','hecate_g4','rapoo_v2','sonix_keyboard',
+                                       'mchose_glw', 'eweadn_s9', 'machenike_m7'):
         if battery_catalog.matches_interface(iface):
             merge_probe(profile.protocol, {})
             try:

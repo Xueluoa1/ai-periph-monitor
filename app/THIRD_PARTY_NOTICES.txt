@@ -131,3 +131,5 @@ Actual interface descriptors checked against user diagnostic run fa0303ce.
 2026-11-20 wireless protocol references: Darmoshark M3 configurator, Wireless-Device-Battery-Monitor, OpenMHub, mchose-v9-pro-battery-tray and OpenMouse mouse-protocol. Protocol facts independently implemented; detailed source URLs and hardware verification limits: docs/适配说明-20261120.md.
 
 2026-11-22 and 2026-11-24 protocol references: HECATE Pulse, Rapoo software research, Wireless-Device-Battery-Monitor, Barracuda X RACE research, 2.4G-Battery-Check, ATK HUB and OpenMouse. Device IDs and packet facts were independently implemented. See docs/适配说明-20261122.md and docs/适配说明-20261124.md for source URLs and verification limits.
+
+2026-11-26 wireless protocol references include Incott receiver research, E HUB, GLW, ATK HUB and Machenike drivers. See docs/适配说明-20261126.md for sources and validation details.

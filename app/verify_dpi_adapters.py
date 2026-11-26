@@ -106,15 +106,17 @@ class DpiTests(unittest.TestCase):
 
     def test_incott_axes_and_packets(self):
         m=ms.Mouse('','','');b=pc.State(m,'incott',1000,(1000,),1,(0x093A,0x522C,b'\1\2\3\xf1\0'))
-        def response(dev,cmd,args,axis=None):
+        def response(dev,interface,cmd,args,axis=None):
             if cmd==0x83:return bytes([9,cmd,2,1])+bytes(60)
             value=(800,1600)[args[0]] if axis==1 else 800
             return bytes([9,cmd,args[0]])+(value//50-1).to_bytes(2,'little')+bytes([0,0,0,axis])+bytes(55)
-        with patch.object(da,'incott_query',side_effect=response),patch.object(da.time,'sleep'):
-            c=da.incott_read(None,None,b);self.assertEqual(c.maximum,45000)
-            dev=Mock();after=da.write(dev,None,c,1,2400,False)
-            self.assertEqual(after.stages[1],(2400,800))
-            dev.set_feature_report.assert_called_once_with(bytes.fromhex('0902012f0000000001'))
+        with patch.object(da.incott,'query',side_effect=response),patch.object(da.time,'sleep'):
+            for length in (9,64):
+                d=SimpleNamespace(feature_len=length)
+                c=da.incott_read(None,d,b);self.assertEqual(c.maximum,45000)
+                dev=Mock();after=da.write(dev,d,c,1,2400,False)
+                self.assertEqual(after.stages[1],(2400,800))
+                dev.set_feature_report.assert_called_once_with(bytes.fromhex('0902012f0000000001').ljust(length,b'\0'))
 
     def test_dareu_checksum_high_range_and_preservation(self):
         m=ms.Mouse('','','');b=pc.State(m,'dareu',1000,(1000,),1,())

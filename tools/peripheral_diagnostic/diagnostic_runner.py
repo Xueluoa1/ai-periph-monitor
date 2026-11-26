@@ -84,8 +84,11 @@ def adaptation_report(folder, records, outcomes, m):
                     if e.get('event') == 'decoded' and e.get('label') in
                     ('battery', 'dpi', 'polling_rate', 'lighting') and 'value' in e}
         outcome = next((o for o in outcomes if o['worker'] == iid), {'status': 'inventory_only'})
+        errors = list(dict.fromkeys(e['message'] for e in events
+                                    if e.get('event') == 'query_error' and isinstance(e.get('message'), str)))
         entry = {k: v for k, v in r.items() if k not in ('path', 'serial', 'group')}
         entry.update(worker_status=outcome['status'], probe_summary=summary,
+                     query_errors=errors,
                      capabilities={key: {'read_status': 'candidate' if key in caps else 'unconfirmed',
                                          'candidate_value': caps.get(key), 'write_status': 'not_tested'}
                                    for key in ('battery', 'dpi', 'polling_rate', 'lighting')})
@@ -93,13 +96,16 @@ def adaptation_report(folder, records, outcomes, m):
         entry['descriptor_collected']=any(e.get('event')=='hid_descriptor' for e in events)
         entry['passive_status']=next((e for e in reversed(events) if e.get('event')=='passive_status'),None)
         result['interfaces'].append(entry)
-        lines.append(f"{r['product'] or r['brand_name']}  {r['vid_hex']}:{r['pid_hex']}  {r['usage_page_hex']}:{r['usage_hex']}")
+        battery = caps.get('battery')
+        model = battery.get('model') if isinstance(battery, dict) else None
+        lines.append(f"{model or r['product'] or r['brand_name']}  {r['vid_hex']}:{r['pid_hex']}  {r['usage_page_hex']}:{r['usage_hex']}")
         lines.append('  状态：' + outcome['status'] + ' | ' + iid)
         labels={'protocol_not_registered':'尚未收录协议，未发送猜测命令','query_no_response':'已发送查询，未收到回复',
                 'query_response_unparsed':'已有原始回复，尚未解析出电量','raw_reports_only':'已采集原始报文，不能直接认作电量',
                 'battery_candidate':'已得到电量候选值','not_queried':'未执行专用查询',
                 'passive_no_report':'已监听厂商接口，未收到主动报文；电量协议尚未确认'}
         lines.append('  查询：'+labels.get(entry['query_status'],entry['query_status']))
+        lines.extend('  查询详情：' + error for error in errors)
         for key, label in [('battery', '电量'), ('dpi', 'DPI'), ('polling_rate', '回报率'), ('lighting', '灯光')]:
             lines.append('  ' + label + '：' + (json.dumps(caps[key], ensure_ascii=False) if key in caps else '未确认'))
     if not records:
@@ -129,6 +135,17 @@ def export_archive(folder, destination, m):
     finally:
         partial.unlink(missing_ok=True)
     return archive
+
+
+def interface_timeout(record, default):
+    if not record['should_probe']:
+        return 5.0
+    # The A9 can need four identity exchanges, then a profile, header and up to
+    # eight DPI rows, each with its own three-second response window.
+    if (record.get('vid'), record.get('pid'), record.get('usage_page'), record.get('usage'),
+            record.get('input_len'), record.get('output_len')) == (0x373B, 0x1279, 0xFF02, 2, 17, 17):
+        return 60.0
+    return default
 
 
 def run(args, m):
@@ -173,7 +190,7 @@ def run(args, m):
                     continue
                 print(f"  {i}/{len(targets)}  {r['product'] or r['brand_name']} {r['usage_page_hex']}", flush=True)
                 outcomes.append(run_child(m, ['--worker', iid, '--out', str(folder)], folder, iid,
-                                          min(m.WORKER_TIMEOUT_S if r['should_probe'] else 5.0, remaining)))
+                                          min(interface_timeout(r, m.WORKER_TIMEOUT_S), remaining)))
         except Exception as exc:
             outcomes.append({'worker': 'orchestrator', 'status': 'failed', 'error': repr(exc)})
         print('[3/3] 保存完整日志…', flush=True)

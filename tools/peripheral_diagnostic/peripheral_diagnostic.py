@@ -37,13 +37,13 @@ import zipfile
 from types import SimpleNamespace
 
 from hid_win import HidInterface, enumerate_hid
-from protocol_probes import BRAND_VIDS, HidDevice, report_ids_for, run_interface_probes
+from protocol_probes import BRAND_VIDS, HidDevice, receiver_label, report_ids_for, run_interface_probes
 import hid_evidence
 import receiver_battery
 import peripheral_protocols as battery_catalog
 
 VERSION = "1.5.0"
-BUILD_ID = '20261124-a9-feedback'
+BUILD_ID = '20261126-wireless-logs'
 WORKER_TIMEOUT_S = 18.0
 INVENTORY_TIMEOUT_S = 20.0
 TOTAL_TIMEOUT_S = 180.0
@@ -132,7 +132,8 @@ def should_probe_interface(iface_rec: dict, probe_all: bool, extra_vids: set[int
             return receiver_battery.matches(candidate)
         profile = battery_catalog.profile_for(candidate)
         if profile and profile.protocol in ('mchose_headset', 'mchose_keyboard', 'mchose_v3', 'darmoshark_telink',
-                                           'hecate_g5','hecate_g4','rapoo_v2','sonix_keyboard'):
+                                           'hecate_g5','hecate_g4','rapoo_v2','sonix_keyboard',
+                                           'mchose_glw', 'eweadn_s9', 'machenike_m7'):
             return battery_catalog.matches_interface(candidate)
 
     # 跳过纯系统鼠标/键盘/多媒体输入通道 (无 Feature Report 且 Output<=4B 仅为 CapsLock 指示灯)
@@ -168,11 +169,7 @@ def worker_inventory(out_dir: Path, probe_all: bool, extra_vids: set[int]) -> in
             rec = asdict(iface)
             token = hashlib.sha256(iface.path.lower().encode()).hexdigest()[:12]
             rec["interface_id"] = f"iface_vid{iface.vid:04x}_pid{iface.pid:04x}_mi{mi or 'xx'}_col{col or 'xx'}_{token}"
-            rec["brand_name"] = BRAND_VIDS.get(iface.vid, f"未知/其他 (0x{iface.vid:04X})")
-            if (iface.vid, iface.pid) == (0x320F, 0x221D):
-                rec["brand_name"] = '多彩 DELUX M618XSD（用户型号与官方驱动核对）'
-            if (iface.vid, iface.pid) == (0x1A2C, 0x8FFF):
-                rec["brand_name"] = 'XY 2.4G 键盘接收器（含黑爵 AK820 Max Plus，共用 ID）'
+            rec["brand_name"] = receiver_label(iface)
             rec["vid_hex"] = f"0x{iface.vid:04X}"
             rec["pid_hex"] = f"0x{iface.pid:04X}"
             rec["usage_page_hex"] = f"0x{iface.usage_page:04X}"

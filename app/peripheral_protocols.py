@@ -9,6 +9,8 @@ import threading
 import time
 
 from hid_win import HidDevice
+import incott_receiver as incott
+import machenike_m7
 import weisheng_keyboard as wk
 import darmoshark_m3pro as dm
 import darmoshark_telink as dt
@@ -18,6 +20,8 @@ import ajazz_ak820 as ak820
 import mchose_headset as mh
 import mchose_keyboard as mk
 import mchose_v3_battery as mv3
+import mchose_glw
+import eweadn_s9
 import log_devices_20261122 as log_devices
 
 
@@ -28,6 +32,9 @@ class Profile:
 
 
 CATALOG = {
+    machenike_m7.RECEIVER: Profile('machenike_m7', machenike_m7.NAME),
+    (0x372E, 0x1026): Profile('eweadn_s9', eweadn_s9.NAME),
+    (0x3837, 0x3033): Profile('mchose_glw', mchose_glw.NAME),
     (0x35BB, 0xA00B): Profile('hecate_g5', log_devices.HECATE_NAME),
     (0x35BB, 0xA22D): Profile('hecate_g4', log_devices.HECATE_G4_NAME),
     (0x24AE, 0x1464): Profile('rapoo_v2', log_devices.RAPOO_NAME),
@@ -40,7 +47,7 @@ CATALOG = {
     (0x320F, 0x5088): Profile('weisheng_keyboard', wk.MODEL),
     (0x260D, 0x1114): Profile('dareu', '达尔优 DAREU A950 PRO Mg 鼠标'),
     (0x24AE, 0x1205): Profile('rapoo', '雷柏 Rapoo VT9 Pro 鼠标'),
-    (0x093A, 0x522C): Profile('incott', '因科特 Incott G23 V2 Pro / 8K 鼠标'),
+    (0x093A, 0x522C): Profile('incott', '2.4G 鼠标接收器（待读取配对型号）'),
     (0x1D57, 0xFA60): Profile('delux', '2.4G 无线鼠标（等待型号上报）'),
     (0x3151, 0x5038): Profile('akko', 'Akko / MonsGeek 2.4G 键盘'),
     (0x388D, 0x0025): Profile('lofree', '洛斐 Lofree Hyzen 键盘'),
@@ -65,6 +72,8 @@ for _pid in (0xFEF8, 0xFEF9, 0xFEFA, 0xFEFC, 0xFEFD, 0xFEFE):
 
 
 def profile_for(iface):
+    if (iface.vid, iface.pid) == (0x3837, 0x3033) and not mchose_glw.is_g75_product(iface):
+        return None
     return CATALOG.get((iface.vid, iface.pid))
 
 
@@ -73,6 +82,12 @@ def matches_interface(iface):
     if not p:
         return False
     page, usage = iface.usage_page, iface.usage
+    if p.protocol == 'machenike_m7':
+        return machenike_m7.matches(iface)
+    if p.protocol == 'eweadn_s9':
+        return eweadn_s9.matches(iface)
+    if p.protocol == 'mchose_glw':
+        return mchose_glw.matches(iface)
     if p.protocol in ('hecate_g5','hecate_g4','rapoo_v2','sonix_keyboard'):
         return log_devices.matches(iface,p.protocol)
     if p.protocol == 'mchose_v3':return mv3.matches(iface)
@@ -101,7 +116,7 @@ def matches_interface(iface):
     if p.protocol == 'rk':
         return page == 0xFF00 and iface.feature_len == 64
     if p.protocol == 'incott':
-        return page == 0xFF05 and iface.input_len >= 8
+        return incott.matches(iface)
     if p.protocol == 'delux':
         # The battery notification also appears on consumer collections.
         return (page == 0x0C or page >= 0xFF00) and iface.input_len >= 5
@@ -184,6 +199,17 @@ _io_lock = threading.Lock()
 
 
 def _active_read(dev, iface, protocol):
+    if protocol == 'machenike_m7':
+        return machenike_m7.read(dev, iface)
+    if protocol == 'eweadn_s9':
+        return eweadn_s9.read(dev, iface)
+    if protocol == 'mchose_glw':
+        return mchose_glw.read(dev, iface)
+    if protocol == 'incott':
+        def notification(identity):
+            raw = _wait(dev, iface, lambda r: decode('incott', r) is not None, 1.5)
+            return decode('incott', raw), raw or b''
+        return incott.read(dev, iface, notification)
     if protocol in ('hecate_g5','hecate_g4','rapoo_v2','sonix_keyboard'):
         return log_devices.read(dev,iface,protocol)
     if protocol == 'darmoshark_telink':return dt.read(dev,iface)
@@ -303,6 +329,22 @@ def prune_listeners(ifaces):
                 _listeners.pop(path).stop.set()
 
 
+def _passive_read(iface, protocol, identity=None):
+    with _listeners_lock:
+        listener = _listeners.get(iface.path)
+        if listener and getattr(listener, 'identity', None) != identity:
+            listener.stop.set()
+            listener = None
+        if listener is None or not listener.thread.is_alive():
+            listener = _listeners[iface.path] = _Listener(iface, protocol)
+            listener.identity = identity
+    listener.ready.wait(0.4)
+    latest = listener.latest
+    if latest is None or time.monotonic() - latest[2] > 120:
+        return None, b''
+    return latest[:2]
+
+
 def read(iface, result_type):
     profile = profile_for(iface)
     if not profile:
@@ -321,17 +363,14 @@ def read(iface, result_type):
         failure.detail = '该接口不是已核实的电量通道'
         return failure
     try:
-        if profile.protocol in ('incott', 'delux', 'rapoo_v2'):
-            with _listeners_lock:
-                listener = _listeners.get(iface.path)
-                if listener is None or not listener.thread.is_alive():
-                    listener = _listeners[iface.path] = _Listener(iface, profile.protocol)
-            listener.ready.wait(0.4)
-            latest = listener.latest
-            if latest is None or time.monotonic() - latest[2] > 120:
+        if profile.protocol == 'incott':
+            with _io_lock, HidDevice(iface.path, write=True) as dev:
+                parsed, raw = incott.read(dev, iface, lambda identity: _passive_read(iface, 'incott', identity))
+        elif profile.protocol in ('delux', 'rapoo_v2'):
+            parsed, raw = _passive_read(iface, profile.protocol)
+            if parsed is None:
                 failure.detail = '等待接收器主动上报电量，请移动或唤醒鼠标'
                 return failure
-            parsed, raw, _ = latest
         else:
             with _io_lock, HidDevice(iface.path, write=True) as dev:
                 parsed, raw = _active_read(dev, iface, profile.protocol)

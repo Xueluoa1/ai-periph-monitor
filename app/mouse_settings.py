@@ -4,6 +4,7 @@ Protocol facts: G-Helper AsusMouse / HarpeAceAimLab; OpenMouse ATK; AM Master AM
 Only explicitly recognized identities are writable; no brand-name fallback.
 """
 from dataclasses import dataclass, field
+from secrets import token_bytes
 import time
 
 import hid_win as hw
@@ -123,14 +124,63 @@ def atk_exchange(dev, iface, command, payload=(), predicate=lambda r: True):
     return raw[1:17]
 
 
-def atk_identity(dev, iface):
+def atk_a9_receiver(iface):
+    return ((getattr(iface,'vid',0),getattr(iface,'pid',0))==(0x373B,0x1279)
+            and (iface.usage_page,iface.usage)==(0xFF02,2)
+            and iface.input_len==iface.output_len==17)
+
+
+def _atk_paired_id(dev, iface):
+    r = atk_exchange(dev, iface, 0x10,
+                     predicate=lambda r: r[0]==0x10 and r[1]==0 and 2<=r[4]<=10)
+    return (r[5],r[6])
+
+
+def _a9_identity_after_timeout(dev, iface, report):
+    # ATK HUB CompX GetWirelessMouseOnline and getMouseInfo. The latter has
+    # four challenge bytes followed by CID, MID and the connection type.
+    online = None
+    try:
+        status = atk_exchange(dev, iface, 3, predicate=lambda r:
+            r[:2]==b'\x03\x00' and 1<=r[4]<=10 and r[5] in (0,1))
+        online = bool(status[5])
+    except TimeoutError:
+        pass
+    if report:
+        report('receiver_online', {'online':online})
+    if online is False:
+        raise OSError('ATK 接收器报告配对鼠标离线，请唤醒鼠标并检查 2.4G 连接')
+    challenge = token_bytes(4)
+    try:
+        info = atk_exchange(dev, iface, 1, (0,0,0,8,*challenge),
+            lambda r:r[:2]==b'\x01\x00' and 7<=r[4]<=10 and (r[9],r[10])!=(0,0))
+    except TimeoutError as exc:
+        # A status reply establishes a live receiver, but does not identify its mouse.
+        if online:
+            try:
+                return _atk_paired_id(dev,iface)
+            except TimeoutError as retry:
+                raise TimeoutError('ATK 接收器报告鼠标在线，但未返回配对型号，请关闭占用接收器的配置软件后重试') from retry
+        raise TimeoutError('ATK 接收器的型号、在线状态和连接信息查询均未获有效回复，请唤醒鼠标后重新读取') from exc
+    connection = info[11]
+    if report:
+        report('connection_info', {'cid':info[9], 'mid':info[10], 'connection_type':connection})
+    if connection not in (0,1,4,5):
+        raise ValueError(f'ATK 返回连接类型 {connection}，未确认是 2.4G 鼠标')
+    identity = (info[9],info[10])
+    if identity not in ((1,39),(1,53)):
+        raise ValueError(f'接收器连接信息返回 CID/MID {identity}，未确认是 A9 Ultimate +')
+    return identity
+
+
+def atk_identity(dev, iface, report=None):
     # Only the read-only identity query is retried; setting writes are not.
     for attempt in range(3):
         try:
-            r = atk_exchange(dev, iface, 0x10,
-                             predicate=lambda r: r[0]==0x10 and r[1]==0 and 2<=r[4]<=10)
-            return (r[5],r[6])
+            return _atk_paired_id(dev,iface)
         except TimeoutError:
+            if atk_a9_receiver(iface):
+                return _a9_identity_after_timeout(dev,iface,report)
             if attempt == 2:
                 raise
             time.sleep(.08)

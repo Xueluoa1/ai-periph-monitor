@@ -169,7 +169,12 @@ class MouseSettingsPage(ttk.Frame):
             self.run(lambda:pc.read(mouse),done,'正在读取回报率与灯光…')
             return
         if not mouse.protocol:
-            self.clear_form(mouse.reason);self.message.configure(text='已发现设备，当前型号暂不开放 DPI 调整。');return
+            self.clear_form(mouse.reason)
+            if mouse.interface and ms.atk_a9_receiver(mouse.interface):
+                self.message.configure(text='已识别 ATK 2.4G 接收器。唤醒鼠标后可点「重新读取设备」再次核对配对型号。')
+            else:
+                self.message.configure(text='已发现设备，当前型号暂不开放 DPI 调整。')
+            return
         self.run(lambda:ms.read(mouse),self.render,'正在读取当前档位和 DPI 数值…')
 
     def render(self,state,selected=None):
@@ -184,6 +189,8 @@ class MouseSettingsPage(ttk.Frame):
         note=getattr(state.protocol_data,'note','')
         if state.mouse.protocol=='atk' and state.mouse.identity==ms.r1nk.IDENTITY:
             note='DPI：200–10000 步进 50；10100–18000 步进 100。此型号使用专用传感器编码。'
+        elif state.mouse.protocol=='atk' and state.mouse.identity in ((1,39),(1,53)):
+            note='1–39999 DPI 可逐点调整。40000–50000 DPI 可选偶数值。'
         if any(x!=y for x,y in state.stages):
             if state.mouse.protocol in ('atk','am35'):
                 note+=' 修改数值会同时设置此档位的 X/Y。'

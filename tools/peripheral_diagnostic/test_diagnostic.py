@@ -23,6 +23,21 @@ def iface(**kwargs):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_a9_dpi_worker_has_time_for_all_eight_slow_replies(self):
+        record = vars(iface(vid=0x373B, pid=0x1279, usage_page=0xFF02, usage=2,
+                            input_len=17, output_len=17, should_probe=True))
+        self.assertEqual(runner.interface_timeout(record, 18), 60)
+        record['usage_page'] = 0xFF06
+        self.assertEqual(runner.interface_timeout(record, 18), 18)
+        record['should_probe'] = False
+        self.assertEqual(runner.interface_timeout(record, 18), 5)
+
+    def test_logged_receiver_labels_respect_shared_keyboard_identity(self):
+        keyboard = iface(vid=0x3554, pid=0xFA09)
+        dock = iface(vid=0x35BB, pid=0xA22D)
+        self.assertEqual(probes.receiver_label(keyboard), probes.battery_catalog.mk.GENERIC)
+        self.assertEqual(probes.receiver_label(dock), probes.battery_catalog.log_devices.HECATE_G4_NAME)
+
     def test_a9_master_uses_new_dpi_addresses_without_writes(self):
         import mouse_settings as ms
         d=iface(vid=0x373B,pid=0x1279,usage_page=0xff02,usage=2,input_len=17,output_len=17)
@@ -75,7 +90,9 @@ class DiagnosticTests(unittest.TestCase):
         dev.set_feature_report.assert_not_called();dev.write_output.assert_not_called()
 
     def test_new_catalog_interfaces_use_monitor_queries_once(self):
-        cases=[dict(vid=0x291d,pid=0x385d,usage_page=0xff90,feature_len=0),
+        cases=[dict(vid=0x372e,pid=0x1026,usage_page=0xff00,usage=1,input_len=0,output_len=0,feature_len=64),
+               dict(vid=0x3837,pid=0x3033,product='MCHOSE G75 V2 2.4G',usage_page=1,usage=0,input_len=65,output_len=65,feature_len=0),
+               dict(vid=0x291d,pid=0x385d,usage_page=0xff90,feature_len=0),
                dict(vid=0x3837,pid=0x1014,usage_page=0xff01,feature_len=0),
                dict(vid=0x3554,pid=0xfa09,usage_page=0xff02,usage=2,input_len=20,output_len=20),
                dict(vid=0x248a,pid=0xff31,usage_page=0x8c,input_len=33,output_len=33,feature_len=1001)]

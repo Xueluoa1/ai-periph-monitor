@@ -34,6 +34,7 @@ def main(output_dir=None):
         z.write(root / 'docs' / '适配说明-20261120.md', '适配说明-20261120.md')
         z.write(root / 'docs' / '适配说明-20261122.md', '适配说明-20261122.md')
         z.write(root / 'docs' / '适配说明-20261124.md', '适配说明-20261124.md')
+        z.write(root / 'docs' / '适配说明-20261126.md', '适配说明-20261126.md')
     print(target)
 
 

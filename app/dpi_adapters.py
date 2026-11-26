@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 import time
 import peripheral_controls as pc
 import vendor_controls as vc
+import incott_receiver as incott
 import razer_controls as rz
 from control_models import MODELS
 from device_io import device_session
@@ -67,32 +68,19 @@ def page_read(dev, d, base):
     return Config(base,'page',stages,active[1]-1,50,maximum,50,raw)
 
 
-def incott_query(dev, command, args=(), axis=None):
-    try:dev.get_feature_report(9,64)
-    except OSError:pass
-    dev.set_feature_report(bytes([9,command,*args]).ljust(9,b'\0'))
-    for _ in range(10):
-        time.sleep(.04)
-        r=dev.get_feature_report(9,64)
-        if len(r)<9 or r[:2]!=bytes([9,command]):continue
-        if command==0x82 and (r[2]!=args[0] or axis is not None and r[8]!=axis):continue
-        return r
-    raise TimeoutError('未收到匹配的 Incott DPI 响应')
-
-
 def incott_read(dev,d,base):
-    cycle=incott_query(dev,0x83,(6,))
+    cycle=incott.query(dev,d,0x83,(6,))
     count,active=cycle[2:4]
     if not 1<=count<=6 or active>=count:raise ValueError('Incott 档位循环无效')
     stages=[]
     for index in range(count):
         pair=[]
         for axis in (1,2):
-            r=incott_query(dev,0x82,(index,axis),axis)
+            r=incott.query(dev,d,0x82,(index,axis),axis)
             pair.append((int.from_bytes(r[3:5],'little')+1)*50)
         stages.append(tuple(pair))
     maximum=45000 if 0xF1 in base.identity[2][3:5] else 32000
-    if incott_query(dev,0x83,(6,))[2:4]!=cycle[2:4]:raise ValueError('读取期间 DPI 档位已变化')
+    if incott.query(dev,d,0x83,(6,))[2:4]!=cycle[2:4]:raise ValueError('读取期间 DPI 档位已变化')
     return Config(base,'incott',tuple(stages),active,50,maximum,50,bytes([count,active]))
 
 
@@ -216,8 +204,8 @@ def write(dev,d,s,stage,value,activate):
         if changed:
             axis=0 if s.stages[stage][0]==s.stages[stage][1] else 1
             encoded=value//50-1
-            dev.set_feature_report(bytes([9,2,stage,encoded&255,encoded>>8,0,0,0,axis]))
-        if active!=s.active:dev.set_feature_report(bytes([9,3,len(pairs),active]).ljust(9,b'\0'))
+            dev.set_feature_report(incott.packet(d,2,(stage,encoded&255,encoded>>8,0,0,0,axis)))
+        if active!=s.active:dev.set_feature_report(incott.packet(d,3,(len(pairs),active)))
         raw[1]=active;time.sleep(.1)
     elif s.family=='vaxee':
         if changed:

@@ -1,8 +1,8 @@
 """Incott, VAXEE and Dareu controls from model-specific protocol records."""
 from dataclasses import replace
 import time
+import incott_receiver as incott
 
-INCOTT_NAMES={1:'Ghero',2:'G23',3:'G24',6:'Zero 29',8:'G23V2',9:'Zero 39',14:'G23V2'}
 INCOTT_RATES={0:1000,1:500,2:250,3:125,4:8000,5:4000,6:2000}
 INCOTT_MODES={0:'连接与回报率',1:'电量状态',2:'低电量提醒'}
 VAXEE_NAMES={0x1003:'XE Wireless',0x1004:'NP-01S Wireless',0x1005:'AX Wireless',
@@ -14,42 +14,28 @@ DAREU_RATES={8:125,4:250,2:500,1:1000,16:2000,32:4000}
 DAREU_MODES={0:'关闭',1:'灯效 1',2:'灯效 2'}
 
 
-def incott_packet(cmd,value=0):return bytes([9,cmd,value]).ljust(9,b'\0')
-
-
-def incott_query(dev,cmd):
-    try:dev.get_feature_report(9,64)  # discard the previously latched response
-    except OSError:pass
-    dev.set_feature_report(incott_packet(cmd))
-    for _ in range(10):
-        time.sleep(.05);raw=dev.get_feature_report(9,64)
-        if len(raw)>=9 and raw[:2]==bytes([9,cmd]):return raw
-    raise TimeoutError('英科特未返回匹配的配置响应')
-
-
 def incott_read(dev,d,mouse,m):
     from peripheral_controls import State,Light
-    ident=incott_query(dev,0x8F)
-    if ident[2]!=1 or ident[3] not in INCOTT_NAMES:raise ValueError('未确认英科特配对型号')
+    ident=incott.query(dev,d,0x8F)
+    name=incott.model_name(ident)
     rates=m.rates if d.pid==0x522C and ident[4]==2 else (125,250,500,1000)
-    code=incott_query(dev,0x81)[2]
+    code=incott.query(dev,d,0x81)[2]
     if code not in INCOTT_RATES or INCOTT_RATES[code] not in rates:raise ValueError('英科特回报率无效')
     light=None;error=''
     if d.pid==0x522C:
         try:
-            mode=incott_query(dev,0x88)[2]
+            mode=incott.query(dev,d,0x88)[2]
             if mode not in INCOTT_MODES:raise ValueError('接收器灯光模式未知')
             light=Light(mode)
         except (OSError,ValueError) as exc:error=str(exc)
-    name='Incott '+INCOTT_NAMES[ident[3]]+(' Pro' if 0xF1 in ident[5:7] else '')
     return State(mouse,name,INCOTT_RATES[code],rates,0,(d.vid,d.pid,bytes(ident[2:7])),light,light_error=error)
 
 
 def incott_write(dev,d,current,wanted):
     if wanted.rate!=current.rate:
         code=next(k for k,v in INCOTT_RATES.items() if v==wanted.rate)
-        dev.set_feature_report(incott_packet(1,code))
-    if wanted.light!=current.light:dev.set_feature_report(incott_packet(8,wanted.light.mode))
+        dev.set_feature_report(incott.packet(d,1,(code,)))
+    if wanted.light!=current.light:dev.set_feature_report(incott.packet(d,8,(wanted.light.mode,)))
     time.sleep(.1)
     return wanted
 
