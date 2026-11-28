@@ -306,6 +306,8 @@ hid.HidP_GetUsageValue.argtypes = [
 ]
 hid.HidD_GetFeature.restype = wintypes.BOOL
 hid.HidD_GetFeature.argtypes = [ctypes.c_void_p, ctypes.c_void_p, wintypes.ULONG]
+hid.HidD_GetInputReport.restype = wintypes.BOOL
+hid.HidD_GetInputReport.argtypes = [ctypes.c_void_p, ctypes.c_void_p, wintypes.ULONG]
 hid.HidD_SetFeature.restype = wintypes.BOOL
 hid.HidD_SetFeature.argtypes = [ctypes.c_void_p, ctypes.c_void_p, wintypes.ULONG]
 hid.HidD_SetOutputReport.restype = wintypes.BOOL
@@ -462,6 +464,8 @@ def enumerate_hid() -> list[HidInterface]:
                 hdev, None, ctypes.byref(HID_GUID), index, ctypes.byref(iface)
             )
             if not ok:
+                if ctypes.get_last_error() != 259:  # ERROR_NO_MORE_ITEMS
+                    raise OSError('HID 接口枚举未完成')
                 break
             index += 1
 
@@ -470,13 +474,13 @@ def enumerate_hid() -> list[HidInterface]:
                 hdev, ctypes.byref(iface), None, 0, ctypes.byref(need), None
             )
             if not need.value:
-                continue
+                raise OSError('HID 接口路径读取失败')
             buf = ctypes.create_string_buffer(need.value)
             ctypes.cast(buf, ctypes.POINTER(wintypes.DWORD))[0] = 8  # cbSize
             if not setupapi.SetupDiGetDeviceInterfaceDetailW(
                 hdev, ctypes.byref(iface), buf, need.value, None, None
             ):
-                continue
+                raise OSError('HID 接口路径读取失败')
             path = ctypes.cast(
                 ctypes.addressof(buf) + 4, ctypes.c_wchar_p
             ).value or ""
@@ -641,6 +645,16 @@ class HidDevice:
         if not hid.HidD_GetFeature(self.handle, buf, length):
             raise HidError(f"读 Feature Report 0x{report_id:02X} 失败 "
                            f"(err={ctypes.get_last_error()})")
+        return buf.raw
+
+    def get_input_report(self, report_id: int, length: int) -> bytes:
+        """Read a control-transfer input report (distinct from interrupt input)."""
+        if not 0 <= report_id <= 255 or not 1 <= length <= 4096:
+            raise ValueError('Invalid input report request')
+        buf = ctypes.create_string_buffer(length)
+        buf[0] = bytes([report_id])
+        if not hid.HidD_GetInputReport(self.handle, buf, length):
+            raise HidError(f'读 Input Report 0x{report_id:02X} 失败 (err={ctypes.get_last_error()})')
         return buf.raw
 
     def set_feature_report(self, data: bytes) -> None:

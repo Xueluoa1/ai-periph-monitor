@@ -6,7 +6,7 @@
 
 ## 1. 下载、启动与退出
 
-1. 从 [Releases](https://github.com/Xueluoa1/ai-periph-monitor/releases) 下载主程序便携 ZIP，解压到一个固定文件夹。
+1. 从 [Releases](https://github.com/Xueluoa1/ai-periph-monitor/releases) 下载主程序便携包 `ai-periph-monitor-v1.0.2-portable.zip`，解压到一个固定文件夹；也可下载独立单文件 `ai-periph-monitor-v1.0.2.exe` 直接运行，跳过解压。诊断工具的发布文件为便携包 `peripheral-diagnostic-v1.5-portable.zip`（解压后为 `多品牌外设诊断工具-v1.5.exe`）和独立单文件 `peripheral-diagnostic-v1.5.exe`。
 2. 双击 `无线外设电量监视器-v1.0.2.exe`，无需另装 Python。不要直接从压缩软件预览窗口运行。
 3. 插入 2.4G 接收器并唤醒设备；蓝牙设备先在 Windows 中完成配对和连接。
 4. 打开「设备」页，点击「立即刷新」。默认刷新间隔为 1 分钟。

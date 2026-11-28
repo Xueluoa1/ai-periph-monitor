@@ -464,6 +464,8 @@ def enumerate_hid() -> list[HidInterface]:
                 hdev, None, ctypes.byref(HID_GUID), index, ctypes.byref(iface)
             )
             if not ok:
+                if ctypes.get_last_error() != 259:  # ERROR_NO_MORE_ITEMS
+                    raise OSError('HID 接口枚举未完成')
                 break
             index += 1
 
@@ -472,13 +474,13 @@ def enumerate_hid() -> list[HidInterface]:
                 hdev, ctypes.byref(iface), None, 0, ctypes.byref(need), None
             )
             if not need.value:
-                continue
+                raise OSError('HID 接口路径读取失败')
             buf = ctypes.create_string_buffer(need.value)
             ctypes.cast(buf, ctypes.POINTER(wintypes.DWORD))[0] = 8  # cbSize
             if not setupapi.SetupDiGetDeviceInterfaceDetailW(
                 hdev, ctypes.byref(iface), buf, need.value, None, None
             ):
-                continue
+                raise OSError('HID 接口路径读取失败')
             path = ctypes.cast(
                 ctypes.addressof(buf) + 4, ctypes.c_wchar_p
             ).value or ""
